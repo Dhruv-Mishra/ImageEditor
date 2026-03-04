@@ -14,6 +14,8 @@ interface CropEditorProps {
   naturalHeight: number;
   initialCrop: CropRegion;
   aspectRatio: AspectRatioOption;
+  /** When set externally (e.g. crop-preset change), the editor adopts this crop without remounting. */
+  externalCrop?: CropRegion | null;
   onCropChange: (crop: CropRegion) => void;
 }
 
@@ -23,6 +25,7 @@ export function CropEditor({
   naturalHeight,
   initialCrop,
   aspectRatio,
+  externalCrop,
   onCropChange,
 }: CropEditorProps) {
   const [crop, setCrop] = useState<CropRegion>(initialCrop);
@@ -77,6 +80,17 @@ export function CropEditor({
     // Only fire when the selected aspect ratio changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aspectRatio]);
+
+  // ---- react to external crop-preset changes ----
+
+  useEffect(() => {
+    if (externalCrop) {
+      setCrop(externalCrop);
+      cropRef.current = externalCrop;
+    }
+    // Only fire when externalCrop reference changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalCrop]);
 
   // ---- handlers ----
 

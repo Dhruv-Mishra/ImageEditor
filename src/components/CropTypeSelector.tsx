@@ -14,14 +14,6 @@ interface CropTypeSelectorProps {
   onSelectCrop: (crop: CropVariant) => void;
 }
 
-/** Icon glyphs per crop type */
-const CROP_ICONS: Record<CropType, string> = {
-  face: '👤',
-  portrait: '🧑',
-  fullbody: '🧍',
-  slightly_far: '🏞️',
-};
-
 export function CropTypeSelector({
   crops,
   selectedType,
@@ -58,15 +50,15 @@ export function CropTypeSelector({
       transition={{ duration: 0.35, ease: 'easeOut', delay: 0.1 }}
     >
       {/* Label */}
-      <p className="mb-2 text-center text-[11px] font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">
-        Crop Type
+      <p className="mb-3 text-center text-[11px] font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+        Crop Preset
       </p>
 
       {/* Scrollable row */}
       <div
-        className="flex gap-2 overflow-x-auto px-1 pb-1 scrollbar-hide sm:justify-center sm:gap-3"
+        className="flex gap-2 overflow-x-auto px-2 py-2 -mx-1 scrollbar-hide sm:justify-center sm:gap-3"
         role="radiogroup"
-        aria-label="Crop type"
+        aria-label="Crop preset"
       >
         {crops.map((crop) => {
           const isSelected = selectedType === crop.type;
@@ -130,7 +122,6 @@ export function CropTypeSelector({
                       draggable={false}
                       className="absolute h-full w-full object-cover"
                       style={{
-                        /* clip the same region from the full image by offsetting */
                         width: `${(imageWidth / crop.cropRegion.width) * 100}%`,
                         height: `${(imageHeight / crop.cropRegion.height) * 100}%`,
                         left: `${-(crop.cropRegion.x / crop.cropRegion.width) * 100}%`,
@@ -142,13 +133,10 @@ export function CropTypeSelector({
                 )}
               </div>
 
-              {/* Icon + Label */}
+              {/* Label + confidence */}
               <div className="relative z-10 flex flex-col items-center gap-0.5">
-                <span className="text-sm leading-none" aria-hidden="true">
-                  {CROP_ICONS[crop.type]}
-                </span>
                 <span
-                  className={`text-[9px] font-bold uppercase tracking-wider transition-colors duration-200 ${
+                  className={`text-[10px] font-bold uppercase tracking-wider transition-colors duration-200 ${
                     isSelected
                       ? 'text-blue-600 dark:text-blue-400'
                       : 'text-gray-500 dark:text-gray-400'

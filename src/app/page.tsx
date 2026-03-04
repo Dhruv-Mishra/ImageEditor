@@ -161,18 +161,16 @@ export default function Home() {
   const handleResetToAi = useCallback(() => {
     vibrate('light');
     if (multiSuggestion) {
-      const defaultCrop = multiSuggestion.crops.find(c => c.type === selectedCropType) ?? multiSuggestion.crops[0];
+      const defaultCrop = multiSuggestion.crops.find(c => c.type === multiSuggestion.defaultType) ?? multiSuggestion.crops[0];
+      setSelectedCropType(defaultCrop.type);
       setCurrentCrop(defaultCrop.cropRegion);
       setAspectRatio(defaultCrop.aspectRatio as AspectRatioOption);
-      setResetKey((k) => k + 1);
     }
-  }, [multiSuggestion, selectedCropType, vibrate]);
+  }, [multiSuggestion, vibrate]);
 
   const handleSelectCropType = useCallback((crop: CropVariant) => {
     setSelectedCropType(crop.type);
     setCurrentCrop(crop.cropRegion);
-    setAspectRatio(crop.aspectRatio as AspectRatioOption);
-    setResetKey((k) => k + 1);
   }, []);
 
   // ---- Export ----
@@ -437,6 +435,7 @@ export default function Home() {
                   naturalHeight={previewDimensions.height}
                   initialCrop={currentCrop}
                   aspectRatio={aspectRatio}
+                  externalCrop={currentCrop}
                   onCropChange={handleCropChange}
                 />
 

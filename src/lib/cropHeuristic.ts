@@ -69,7 +69,7 @@ export function generateMultiCropSuggestions(
   const faceH = faceW / faceAspect;
   const faceCrop: CropVariant = {
     type: 'face',
-    label: 'Face',
+    label: 'Close',
     cropRegion: clamp({
       x: (imageWidth - faceW) / 2,
       y: imageHeight * 0.05,
@@ -90,7 +90,7 @@ export function generateMultiCropSuggestions(
   }
   const portraitCrop: CropVariant = {
     type: 'portrait',
-    label: 'Portrait',
+    label: 'Medium',
     cropRegion: clamp({
       x: (imageWidth - portraitW) / 2,
       y: imageHeight * 0.06,
@@ -114,7 +114,7 @@ export function generateMultiCropSuggestions(
   }
   const fullbodyCrop: CropVariant = {
     type: 'fullbody',
-    label: 'Full Body',
+    label: 'Wide',
     cropRegion: clamp({
       x: (imageWidth - fullbodyW) / 2,
       y: imageHeight * 0.05,
@@ -135,7 +135,7 @@ export function generateMultiCropSuggestions(
   }
   const slightlyFarCrop: CropVariant = {
     type: 'slightly_far',
-    label: 'Slightly Far',
+    label: 'Full',
     cropRegion: clamp({
       x: (imageWidth - slightlyFarW) / 2,
       y: (imageHeight - slightlyFarH) / 2,
