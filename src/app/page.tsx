@@ -576,7 +576,7 @@ export default function Home() {
   const handleSelectCropType = useCallback((crop: CropVariant) => {
     setSelectedCropType(crop.type);
     setCurrentCrop(crop.cropRegion);
-    setAspectRatio(crop.aspectRatio as AspectRatioOption);
+    // Don't change aspectRatio — let the user's current aspect ratio selection persist
   }, []);
 
   // ---- Export ----
@@ -711,8 +711,10 @@ export default function Home() {
     setResetKey(0);
     setLastExportBlob(null);
 
-    // Scroll to top so the user sees the homepage hero
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Scroll to top after animations settle so the user sees the homepage hero
+    requestAnimationFrame(() => {
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 200);
+    });
 
     // Notify nav components that the session is gone
     try {
@@ -731,7 +733,9 @@ export default function Home() {
     // Transition to idle view
     setAppState('idle');
     setLastExportBlob(null);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    requestAnimationFrame(() => {
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 200);
+    });
 
     // Notify nav components
     try {

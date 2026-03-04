@@ -24,6 +24,8 @@ APP_USER="ubuntu"
 APP_DIR="$(cd "$(dirname "$0")" && pwd)"   # directory where this script lives
 SERVICE_NAME="cropio"
 NODE_MAJOR=20
+PORT=3001
+BACKEND_PORT=8001
 
 echo ""
 echo "══════════════════════════════════════════════"
@@ -87,6 +89,8 @@ WorkingDirectory=${APP_DIR}
 # Activate the Python venv so uvicorn + ultralytics are available
 Environment=PATH=${APP_DIR}/backend/venv/bin:/usr/local/bin:/usr/bin:/bin
 Environment=NODE_ENV=production
+Environment=PORT=${PORT}
+Environment=BACKEND_PORT=${BACKEND_PORT}
 ExecStart=/bin/bash ${APP_DIR}/start.sh
 Restart=on-failure
 RestartSec=5
@@ -107,11 +111,15 @@ systemctl enable "$SERVICE_NAME"
 # ── 5. Nginx configuration ─────────────────────────────────────────
 echo "▶ [5/7] Configuring Nginx reverse proxy…"
 
-cat > "/etc/nginx/sites-available/${SERVICE_NAME}" <<'NGINX'
+cat > "/etc/nginx/sites-available/${SERVICE_NAME}" <<NGINX
+upstream cropio_nextjs {
+    server 127.0.0.1:${PORT};
+}
+
 server {
     listen 80;
     listen [::]:80;
-    server_name DOMAIN_PLACEHOLDER;
+    server_name ${DOMAIN};
 
     # ── Gzip ──
     gzip on;
@@ -129,31 +137,31 @@ server {
 
     # ── Static image assets — long-lived cache ──
     location /images/ {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://cropio_nextjs;
         expires 1y;
         add_header Cache-Control "public, immutable";
-        proxy_set_header Host $host;
+        proxy_set_header Host \$host;
     }
 
     # ── Next.js static chunks — immutable ──
     location /_next/static/ {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://cropio_nextjs;
         expires 1y;
         add_header Cache-Control "public, immutable";
-        proxy_set_header Host $host;
+        proxy_set_header Host \$host;
     }
 
     # ── Everything else → Next.js ──
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://cropio_nextjs;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_cache_bypass \$http_upgrade;
 
         # Allow image uploads up to 10 MB
         client_max_body_size 10M;
@@ -161,12 +169,8 @@ server {
 }
 NGINX
 
-# Replace placeholder with actual domain
-sed -i "s/DOMAIN_PLACEHOLDER/${DOMAIN}/g" "/etc/nginx/sites-available/${SERVICE_NAME}"
-
-# Enable site, remove default if present
+# Enable site (only manage the cropio symlink — don't touch other sites)
 ln -sf "/etc/nginx/sites-available/${SERVICE_NAME}" "/etc/nginx/sites-enabled/${SERVICE_NAME}"
-rm -f /etc/nginx/sites-enabled/default
 
 nginx -t
 systemctl reload nginx

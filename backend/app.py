@@ -81,10 +81,14 @@ def _clamp(val: float, lo: float, hi: float) -> float:
 def _enforce_aspect_ratio(
     cx: float, cy: float, w: float, h: float,
     target_ratio: float, img_w: int, img_h: int,
+    max_fraction: float = 1.0,
 ) -> tuple[int, int, int, int]:
     """
     Adjust width/height around (cx, cy) to match target_ratio = w/h.
     Expand the smaller dimension so no content is lost, then clamp to image.
+
+    max_fraction: if > 0, cap the crop to at most this fraction of the image
+                  dimension on each axis (e.g. 0.7 = don't exceed 70% of image).
     """
     current_ratio = w / h if h > 0 else 1.0
 
@@ -94,6 +98,15 @@ def _enforce_aspect_ratio(
     else:
         # Too tall → grow width
         w = h * target_ratio
+
+    # Cap to max_fraction of image dimensions to prevent full-image crops
+    if max_fraction < 1.0:
+        max_w = img_w * max_fraction
+        max_h = img_h * max_fraction
+        if w > max_w or h > max_h:
+            scale = min(max_w / w, max_h / h)
+            w *= scale
+            h *= scale
 
     x = _clamp(cx - w / 2, 0, img_w - 1)
     y = _clamp(cy - h / 2, 0, img_h - 1)
@@ -135,8 +148,11 @@ def compute_crops(
         fx1, fy1 = pts.min(axis=0)
         fx2, fy2 = pts.max(axis=0)
         fw, fh = fx2 - fx1, fy2 - fy1
-        pad_x = max(fw * 0.75, body_w * 0.10)
-        pad_y = max(fh * 1.0, body_h * 0.05)
+        # Use face-proportional padding — avoids over-expansion on low-res
+        # images where body_w/body_h is large relative to the face
+        face_span = max(fw, fh, 1.0)
+        pad_x = face_span * 0.9
+        pad_y = face_span * 1.1
         raw_x1 = fx1 - pad_x
         raw_y1 = fy1 - pad_y * 1.3
         raw_x2 = fx2 + pad_x
@@ -152,8 +168,11 @@ def compute_crops(
     face_w = raw_x2 - raw_x1
     face_h = raw_y2 - raw_y1
     meta = CROP_META["face"]
+    # Cap face crop to 60% of image to prevent near-full-image face crops on
+    # low-resolution images where the person fills the entire frame.
     x, y, w, h = _enforce_aspect_ratio(
-        face_cx, face_cy, face_w, face_h, meta["ratio"], img_w, img_h
+        face_cx, face_cy, face_w, face_h, meta["ratio"], img_w, img_h,
+        max_fraction=0.6,
     )
     crops.append(CropVariant(
         type="face", label=meta["label"],
@@ -182,7 +201,8 @@ def compute_crops(
     sh_h = raw_bot - raw_top
     meta = CROP_META["portrait"]
     x, y, w, h = _enforce_aspect_ratio(
-        sh_cx, sh_cy, sh_w, sh_h, meta["ratio"], img_w, img_h
+        sh_cx, sh_cy, sh_w, sh_h, meta["ratio"], img_w, img_h,
+        max_fraction=0.75,
     )
     crops.append(CropVariant(
         type="portrait", label=meta["label"],
