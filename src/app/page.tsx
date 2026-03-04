@@ -95,6 +95,7 @@ export default function Home() {
   const fullResBlobRef = useRef<Blob | null>(null);
   const previewBlobRef = useRef<Blob | null>(null);
   const sessionSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const thumbUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionRestoredRef = useRef(false);
   const persistenceInitRef = useRef(false);
   const sessionIdRef = useRef<string | null>(null);
@@ -159,6 +160,29 @@ export default function Home() {
       if (data) saveSession(data);
     }, 300);
   }, [buildSessionData]);
+
+  /**
+   * Flush-save the session with a fresh thumbnail generated from the current
+   * crop region. Called on every "exit" — Home, page switch, tab close, etc.
+   */
+  const flushSessionWithThumbnail = useCallback(async () => {
+    if (!sessionIdRef.current || !previewBlobRef.current || !currentCrop) return;
+    // Cancel any pending debounced save
+    if (sessionSaveTimerRef.current) clearTimeout(sessionSaveTimerRef.current);
+    try {
+      // Crop the preview image to the current crop region, then generate a thumbnail
+      const previewUrl = URL.createObjectURL(previewBlobRef.current);
+      try {
+        const croppedBlob = await cropImage(previewUrl, currentCrop, 'image/jpeg', 0.9);
+        const thumb = await generateThumbnailDataUrl(croppedBlob, 480);
+        sessionThumbnailRef.current = thumb;
+      } finally {
+        URL.revokeObjectURL(previewUrl);
+      }
+    } catch { /* keep existing thumbnail on failure */ }
+    const data = buildSessionData();
+    if (data) await saveSession(data);
+  }, [buildSessionData, currentCrop]);
 
   // Persist session when editing state changes
   // IMPORTANT: Skip the first run (mount) so we don't remove a localStorage key
@@ -296,13 +320,68 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cleanup object URLs on unmount to prevent memory leaks
+  // Keep the cropped thumbnail continuously fresh (1s debounce on crop changes)
+  useEffect(() => {
+    if (appState !== 'editing' || !previewBlobRef.current || !currentCrop) return;
+    if (thumbUpdateTimerRef.current) clearTimeout(thumbUpdateTimerRef.current);
+    thumbUpdateTimerRef.current = setTimeout(async () => {
+      try {
+        const url = URL.createObjectURL(previewBlobRef.current!);
+        try {
+          const cropped = await cropImage(url, currentCrop, 'image/jpeg', 0.9);
+          const thumb = await generateThumbnailDataUrl(cropped, 480);
+          sessionThumbnailRef.current = thumb;
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      } catch { /* ignore */ }
+    }, 1000);
+    return () => {
+      if (thumbUpdateTimerRef.current) clearTimeout(thumbUpdateTimerRef.current);
+    };
+  }, [appState, currentCrop]);
+
+  // Cleanup object URLs on unmount + synchronous session flush
+  const buildSessionDataRef = useRef(buildSessionData);
+  useEffect(() => { buildSessionDataRef.current = buildSessionData; }, [buildSessionData]);
+
   useEffect(() => {
     return () => {
+      // Flush session synchronously on unmount (any navigation away)
+      if (sessionIdRef.current) {
+        if (sessionSaveTimerRef.current) clearTimeout(sessionSaveTimerRef.current);
+        if (thumbUpdateTimerRef.current) clearTimeout(thumbUpdateTimerRef.current);
+        const data = buildSessionDataRef.current();
+        if (data) saveSession(data);
+      }
       if (fullResUrlRef.current) URL.revokeObjectURL(fullResUrlRef.current);
       if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     };
   }, []);
+
+  // Persist session on page-switch (visibilitychange) and tab/window close (beforeunload)
+  const flushRef = useRef(flushSessionWithThumbnail);
+  useEffect(() => { flushRef.current = flushSessionWithThumbnail; }, [flushSessionWithThumbnail]);
+
+  useEffect(() => {
+    const onBeforeUnload = () => {
+      // Synchronous best-effort: save with current thumbnail (can't await in beforeunload)
+      if (sessionSaveTimerRef.current) clearTimeout(sessionSaveTimerRef.current);
+      const data = buildSessionData();
+      if (data) saveSession(data);
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && sessionIdRef.current) {
+        flushRef.current();
+      }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [buildSessionData]);
 
   // ---- Upload & API call ----
 
@@ -360,12 +439,9 @@ export default function Home() {
         setCurrentCrop(defaultCrop.cropRegion);
         setAspectRatio(defaultCrop.aspectRatio as AspectRatioOption);
         setResetKey(0);
-        // Save the current active session before starting a new one (preserve history)
+        // Save the current active session with fresh thumbnail before starting a new one
         if (sessionIdRef.current) {
-          const prevData = buildSessionData();
-          if (prevData) {
-            try { await saveSession(prevData); } catch { /* ignore */ }
-          }
+          try { await flushSessionWithThumbnail(); } catch { /* ignore */ }
         }
         sessionIdRef.current = generateUUID();
         sessionCreatedAtRef.current = Date.now();
@@ -401,7 +477,7 @@ export default function Home() {
         setAppState('idle');
       }
     },
-    [checkShareSupport, vibrate, buildSessionData],
+    [checkShareSupport, vibrate, flushSessionWithThumbnail],
   );
 
   // ---- Crop interactions ----
@@ -563,10 +639,9 @@ export default function Home() {
   }, [fullResUrl, previewUrl, vibrate]);
 
   /** Navigate to idle view — session remains in IndexedDB for resume via Edit. */
-  const handleGoHome = useCallback(() => {
-    // Flush-save the current session to IndexedDB
-    const data = buildSessionData();
-    if (data) saveSession(data);
+  const handleGoHome = useCallback(async () => {
+    // Flush-save the session with a fresh thumbnail
+    await flushSessionWithThumbnail();
 
     // Clear the active-session flag so nav highlights Home correctly
     localStorage.removeItem(ACTIVE_SESSION_KEY);
@@ -580,7 +655,7 @@ export default function Home() {
     try {
       window.dispatchEvent(new CustomEvent('cropai:session-changed'));
     } catch { /* SSR guard */ }
-  }, [buildSessionData]);
+  }, [flushSessionWithThumbnail]);
 
   // Keep a stable ref to the latest handleGoHome so the event listener never has gaps
   const handleGoHomeRef = useRef(handleGoHome);
