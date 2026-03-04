@@ -7,7 +7,7 @@ const footerLinks = {
     { label: 'About', href: '/about' },
   ],
   resources: [
-    { label: 'GitHub', href: 'https://github.com' },
+    { label: 'GitHub', href: 'https://github.com/Dhruv-Mishra/ImageEditor' },
     { label: 'Documentation', href: '#' },
     { label: 'Privacy Policy', href: '#' },
   ],
@@ -24,7 +24,7 @@ const techStack = [
 
 export function Footer() {
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 mb-8 pointer-events-none hidden sm:block">
+    <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 mb-20 sm:mb-8 pointer-events-none">
       <footer className="pointer-events-auto rounded-3xl border border-white/20 bg-white/90 shadow-[0_8px_30px_rgb(0,0,0,0.08)] dark:border-gray-700/50 dark:bg-gray-900/90 px-6 py-10 sm:px-10">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand column */}

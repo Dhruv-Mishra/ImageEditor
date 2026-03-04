@@ -33,9 +33,9 @@ export function PhotoMarquee() {
             ref={containerRef}
             className="w-full relative overflow-hidden bg-white/70 dark:bg-black/60 py-12 sm:py-16 my-8 shadow-sm dark:shadow-xl border-y border-gray-200/50 dark:border-white/5 opacity-90 transition-all duration-500"
         >
-            {/* Film Sprockets (desktop only) */}
-            <div className="hidden sm:block absolute top-2 left-0 right-0 h-4 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSIyMCI+PHJlY3QgeD0iMTYiIHk9IjQiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxMiIgZmlsbD0iIzAwMDAwMCIgb3BhY2l0eT0iMC4xIiByeD0iMiIvPjwvc3ZnPg==')] dark:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSIyMCI+PHJlY3QgeD0iMTYiIHk9IjQiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxMiIgZmlsbD0iI2ZmZmZmZiIgb3BhY2l0eT0iMC4yNSIgcng9IjIiLz48L3N2Zz4=')] bg-repeat-x transition-all" />
-            <div className="hidden sm:block absolute bottom-2 left-0 right-0 h-4 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSIyMCI+PHJlY3QgeD0iMTYiIHk9IjQiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxMiIgZmlsbD0iIzAwMDAwMCIgb3BhY2l0eT0iMC4xIiByeD0iMiIvPjwvc3ZnPg==')] dark:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSIyMCI+PHJlY3QgeD0iMTYiIHk9IjQiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxMiIgZmlsbD0iI2ZmZmZmZiIgb3BhY2l0eT0iMC4yNSIgcng9IjIiLz48L3N2Zz4=')] bg-repeat-x transition-all" />
+teh             {/* Film Sprockets */}
+            <div className="absolute top-2 left-0 right-0 h-3 sm:h-4 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSIyMCI+PHJlY3QgeD0iMTYiIHk9IjQiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxMiIgZmlsbD0iIzAwMDAwMCIgb3BhY2l0eT0iMC4xIiByeD0iMiIvPjwvc3ZnPg==')] dark:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSIyMCI+PHJlY3QgeD0iMTYiIHk9IjQiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxMiIgZmlsbD0iI2ZmZmZmZiIgb3BhY2l0eT0iMC4yNSIgcng9IjIiLz48L3N2Zz4=')] bg-repeat-x transition-all" />
+            <div className="absolute bottom-2 left-0 right-0 h-3 sm:h-4 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSIyMCI+PHJlY3QgeD0iMTYiIHk9IjQiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxMiIgZmlsbD0iIzAwMDAwMCIgb3BhY2l0eT0iMC4xIiByeD0iMiIvPjwvc3ZnPg==')] dark:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSIyMCI+PHJlY3QgeD0iMTYiIHk9IjQiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxMiIgZmlsbD0iI2ZmZmZmZiIgb3BhY2l0eT0iMC4yNSIgcng9IjIiLz48L3N2Zz4=')] bg-repeat-x transition-all" />
 
             <div className="mb-6 text-center px-4 relative z-10">
                 <p className="text-sm font-bold uppercase tracking-[0.2em] text-gray-500 dark:text-white/50 transition-colors">
@@ -50,7 +50,7 @@ export function PhotoMarquee() {
                     style={{ willChange: isVisible ? 'transform' : 'auto' }}
                 >
                     {Array.from({ length: 3 }).map((_, blockIdx) => (
-                        <div key={blockIdx} className="flex gap-16 pr-16 items-center">
+                        <div key={blockIdx} className="flex gap-6 pr-6 sm:gap-16 sm:pr-16 items-center">
                             {portraits.map((src, idx) => (
                                 <div
                                     key={`${blockIdx}-${idx}`}
