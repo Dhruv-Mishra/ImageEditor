@@ -16,18 +16,15 @@ function formatTimeAgo(timestamp: number): string {
 
 interface CropHistoryProps {
   entries: HistoryEntry[];
+  onSelect?: (entry: HistoryEntry) => void;
   onClear: () => void;
 }
 
-export function CropHistory({ entries, onClear }: CropHistoryProps) {
+export function CropHistory({ entries, onSelect, onClear }: CropHistoryProps) {
   if (entries.length === 0) return null;
 
-  const handleRedownload = (entry: HistoryEntry) => {
-    downloadBlob(entry.blob, `cropped-${entry.id.slice(0, 8)}.jpg`);
-  };
-
   return (
-    <section className="border-t border-gray-200/60 py-10 dark:border-gray-800/60">
+    <section id="archive" className="border-t border-gray-200/60 py-10 dark:border-gray-800/60 scroll-mt-24">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         {/* Section header */}
         <div className="mb-5 flex items-center justify-between">
@@ -48,8 +45,8 @@ export function CropHistory({ entries, onClear }: CropHistoryProps) {
                 />
               </svg>
             </div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Recent Exports
+            <h2 className="text-lg font-bold uppercase tracking-widest text-gray-900 dark:text-white">
+              Archive
             </h2>
             <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">
               {entries.length}
@@ -76,8 +73,8 @@ export function CropHistory({ entries, onClear }: CropHistoryProps) {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ duration: 0.25, delay: index * 0.05 }}
-                onClick={() => handleRedownload(entry)}
-                title="Click to download again"
+                onClick={() => onSelect?.(entry)}
+                title="Click to load into editor"
                 className="group relative shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:shadow-md dark:border-gray-700 dark:bg-gray-900"
               >
                 {/* Thumbnail */}
@@ -85,7 +82,7 @@ export function CropHistory({ entries, onClear }: CropHistoryProps) {
                 <img
                   src={entry.thumbnailDataUrl}
                   alt={`Export: ${entry.dimensions.width}×${entry.dimensions.height}px`}
-                  className="h-28 w-auto min-w-[80px] object-cover transition-transform duration-200 group-hover:scale-105 sm:h-32"
+                  className="h-28 w-auto min-w-[80px] object-cover transition-transform duration-200 group-hover:scale-105 sm:h-32 filter brightness-95"
                 />
 
                 {/* Overlay on hover */}
@@ -101,7 +98,7 @@ export function CropHistory({ entries, onClear }: CropHistoryProps) {
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
+                      d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"
                     />
                   </svg>
                 </div>

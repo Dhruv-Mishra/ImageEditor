@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UploadZone } from '@/components/UploadZone';
 import { CropEditor } from '@/components/CropEditor';
 import { AspectRatioSelector } from '@/components/AspectRatioSelector';
-import { HowItWorks } from '@/components/HowItWorks';
+import { PhotoMarquee } from '@/components/PhotoMarquee';
 import { CropHistory } from '@/components/CropHistory';
 import type {
   CropSuggestion,
@@ -21,6 +21,7 @@ import {
   scaleToFullRes,
   generateThumbnailDataUrl,
 } from '@/lib/imageUtils';
+import { saveHistoryEntry, loadHistory, clearHistoryData } from '@/lib/db';
 
 type AppState = 'idle' | 'uploading' | 'editing' | 'exporting';
 
@@ -63,6 +64,15 @@ export default function Home() {
     } catch {
       setCanShare(false);
     }
+  }, []);
+
+  // Load history from IndexedDB on mount
+  useEffect(() => {
+    loadHistory().then((data) => {
+      if (data && data.length > 0) {
+        setHistory(data);
+      }
+    });
   }, []);
 
   // ---- Upload & API call ----
@@ -154,7 +164,10 @@ export default function Home() {
         timestamp: Date.now(),
         blob,
       };
-      setHistory((prev) => [entry, ...prev].slice(0, 20));
+
+      const newHistory = [entry, ...history].slice(0, 20);
+      setHistory(newHistory);
+      saveHistoryEntry(entry); // Save to IndexedDB
 
       toast.success('Image exported successfully!');
     } catch {
@@ -162,7 +175,7 @@ export default function Home() {
     } finally {
       setAppState('editing');
     }
-  }, [currentCrop, fullResUrl, scaleFactor]);
+  }, [currentCrop, fullResUrl, scaleFactor, history]);
 
   // ---- Sharing ----
 
@@ -197,9 +210,23 @@ export default function Home() {
 
   // ---- History ----
 
-  const handleClearHistory = useCallback(() => {
+  const handleClearHistory = useCallback(async () => {
+    await clearHistoryData();
     setHistory([]);
   }, []);
+
+  const handleLoadFromHistory = useCallback(
+    (entry: HistoryEntry) => {
+      // Reconstitute the blob as a File and pass it exactly as if the user dragged it
+      const pseudoFile = new File([entry.blob], `export-${entry.id.slice(0, 8)}.jpg`, {
+        type: entry.blob.type,
+      });
+      // Scroll to top so they see the editor UI
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      handleImageSelected(pseudoFile);
+    },
+    [handleImageSelected]
+  );
 
   // ---- Start over ----
 
@@ -251,7 +278,7 @@ export default function Home() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.2 }}
-              className="flex min-h-[calc(100vh-16rem)] w-full flex-col items-center justify-center"
+              className="flex min-h-[50vh] w-full flex-col items-center justify-center py-6 sm:py-10"
             >
               {/* Hero heading */}
               <div className="mb-10 text-center">
@@ -290,7 +317,7 @@ export default function Home() {
               animate="animate"
               exit="exit"
               transition={{ duration: 0.2 }}
-              className="flex min-h-[calc(100vh-16rem)] w-full flex-col items-center justify-center space-y-6"
+              className="flex min-h-[50vh] w-full flex-col items-center justify-center space-y-6 py-6 sm:py-10"
             >
               <div className="flex w-full min-h-[280px] max-w-2xl items-center justify-center overflow-hidden rounded-3xl bg-gray-100/50 shadow-sm backdrop-blur-sm dark:bg-gray-900/50 border-2 border-dashed border-gray-200 dark:border-gray-800">
                 <div className="flex w-full items-center justify-center py-12">
@@ -514,11 +541,26 @@ export default function Home() {
         </AnimatePresence>
       </section>
 
-      {/* ---- History (session) ---- */}
-      <CropHistory entries={history} onClear={handleClearHistory} />
+      {/* ---- Photo Marquee (only idle) ---- */}
+      <AnimatePresence>
+        {appState === 'idle' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <PhotoMarquee />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* ---- Landing sections ---- */}
-      <HowItWorks />
+      {/* ---- Archive (Session & DB) ---- */}
+      <CropHistory
+        entries={history}
+        onSelect={handleLoadFromHistory}
+        onClear={handleClearHistory}
+      />
     </>
   );
 }

@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 const footerLinks = {
   product: [
     { label: 'Upload Photo', href: '/' },
-    { label: 'How It Works', href: '#how-it-works' },
+    { label: 'Archive', href: '#archive' },
     { label: 'Features', href: '#features' },
   ],
   resources: [
