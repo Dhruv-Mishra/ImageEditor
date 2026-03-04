@@ -19,12 +19,14 @@ Upload a portrait photo · Get intelligent crop suggestions · Fine-tune interac
 
 - 📸 **Drag-and-drop upload** — supports JPEG, PNG, and WebP (up to 10 MB)
 - 🤖 **AI-powered crop suggestions** — YOLO11 pose estimation detects keypoints and generates multiple crop types (face closeup, shoulder portrait, full body, wide)
-- 🖼️ **Interactive crop editor** — drag, resize from corners/edges, semi-transparent overlay
+- 🖼️ **Interactive crop editor** — drag, resize from corners/edges, clean minimal overlay with solid border
 - 📐 **Multiple crop types** — Face Closeup (1:1), Shoulder Portrait (3:4), Full Body (3:4), Wide (4:5)
 - 🔄 **Aspect ratio presets** — 1:1, 3:4, 4:5, Free
 - ↩️ **Reset to AI suggestion** — one-click restore to the original recommendation
 - 💾 **Full-resolution export** — Canvas API crops at natural image resolution, browser JPEG download
-- 🗂️ **Crop history & archive** — browse and re-edit previously exported crops
+- 🧠 **AI image description** — NVIDIA Vision API generates concise descriptions with typewriter animation
+- 🔍 **Semantic search** — vector embeddings (NVIDIA nv-embedqa-e5-v5) enable AI-powered search across your archive
+- 🗂️ **Crop history & archive** — browse, search, and re-edit previously exported crops and saved sessions
 - 🌙 **Dark / Light theme** — toggle with next-themes
 - 📱 **Fully responsive** — desktop, tablet, and mobile with dedicated mobile navigation
 - ⚡ **Haptic feedback** — subtle vibrations on supported devices
@@ -40,8 +42,11 @@ Upload a portrait photo · Get intelligent crop suggestions · Fine-tune interac
 | **Language** | TypeScript (strict) |
 | **Crop Editor** | react-image-crop |
 | **AI / ML** | YOLO11 Pose (Ultralytics) via FastAPI backend |
+| **AI Vision** | NVIDIA Mistral-14B (image description via API) |
+| **AI Embeddings** | NVIDIA nv-embedqa-e5-v5 (semantic search) |
 | **Server Image Processing** | sharp, Pillow |
 | **Client Export** | Canvas API |
+| **Client Vector DB** | IndexedDB with cosine similarity search |
 | **Animations** | Framer Motion |
 | **Theming** | next-themes |
 | **Notifications** | sonner |
@@ -60,9 +65,12 @@ Upload a portrait photo · Get intelligent crop suggestions · Fine-tune interac
 │   └── dev.mjs                 # Unified dev script (starts backend + frontend)
 ├── src/
 │   ├── app/
+│   │   ├── api/
+│   │   │   ├── describe/route.ts  # AI image description (NVIDIA Vision API)
+│   │   │   └── embed/route.ts     # Text embedding (NVIDIA nv-embedqa-e5-v5)
 │   │   ├── page.tsx            # Landing page with upload zone & photo marquee
 │   │   ├── edit/page.tsx       # Crop editor page (state machine)
-│   │   ├── archive/page.tsx    # Crop history & saved sessions
+│   │   ├── archive/page.tsx    # Crop history, sessions & semantic search
 │   │   ├── about/page.tsx      # About page
 │   │   ├── layout.tsx          # Root layout (theme, header, footer)
 │   │   └── error.tsx           # Error boundary
@@ -81,7 +89,8 @@ Upload a portrait photo · Get intelligent crop suggestions · Fine-tune interac
 │       ├── types.ts            # Shared TypeScript interfaces
 │       ├── imageUtils.ts       # Canvas crop, download, validation, downscaling
 │       ├── cropHeuristic.ts    # Fallback deterministic crop heuristic
-│       ├── db.ts               # Client-side storage for crop history
+│       ├── db.ts               # IndexedDB storage for history & sessions
+│       ├── vectorDb.ts         # Client-side vector DB with cosine similarity
 │       ├── pendingUpload.ts    # Upload state management
 │       ├── haptics.ts          # Haptic feedback utilities
 │       └── useTypewriter.ts    # Typewriter effect hook
@@ -164,6 +173,41 @@ Accepts a multipart form upload with an `image` field. Returns multiple AI-gener
 
 The backend uses **YOLO11 Nano Pose** to detect body keypoints and intelligently compute crop regions. Falls back to a deterministic heuristic if no person is detected.
 
+### `POST /api/describe`
+
+Next.js API route. Accepts a multipart form upload with an `image` field. Sends a downscaled WebP (400px) to the NVIDIA Vision API and returns a concise plain-text description.
+
+**Response:**
+
+```json
+{
+  "description": "A young woman stands outdoors in a park wearing a navy blazer over a white blouse. She has a warm smile and her hair is pulled back in a low bun. The background shows soft green foliage with dappled sunlight."
+}
+```
+
+### `POST /api/embed`
+
+Next.js API route. Accepts JSON with a `text` field and optional `inputType` (`"passage"` or `"query"`). Returns a 1024-dimensional embedding vector from NVIDIA nv-embedqa-e5-v5.
+
+**Request:**
+
+```json
+{
+  "text": "A woman in a navy blazer in a park",
+  "inputType": "query"
+}
+```
+
+**Response:**
+
+```json
+{
+  "embedding": [0.023, -0.041, 0.087, ...]
+}
+```
+
+Embeddings are stored in the client-side IndexedDB vector database for semantic search across the archive.
+
 ---
 
 ## 📋 Scripts
@@ -182,7 +226,7 @@ The backend uses **YOLO11 Nano Pose** to detect body keypoints and intelligently
 
 ## 🔒 Privacy
 
-All image processing happens **locally** — images are sent to your own backend for AI analysis and never leave your infrastructure. The client-side Canvas API handles the final crop and export. No data is transmitted to third-party servers.
+Crop detection runs on **your own backend** — images are sent to the YOLO11 model on your server and never leave your infrastructure. AI descriptions are generated via the NVIDIA API (images are sent as base64 to NVIDIA's servers for inference only). The client-side Canvas API handles the final crop and export. Embedding vectors and descriptions are cached locally in the browser's IndexedDB.
 
 ---
 
