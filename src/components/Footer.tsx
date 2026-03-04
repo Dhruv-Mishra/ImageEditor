@@ -5,8 +5,8 @@ import { motion } from 'framer-motion';
 const footerLinks = {
   product: [
     { label: 'Upload Photo', href: '/' },
-    { label: 'Archive', href: '#archive' },
-    { label: 'Features', href: '#features' },
+    { label: 'Archive', href: '/archive' },
+    { label: 'About', href: '/about' },
   ],
   resources: [
     { label: 'GitHub', href: 'https://github.com' },
@@ -26,8 +26,8 @@ const techStack = [
 
 export function Footer() {
   return (
-    <footer className="border-t border-gray-200/50 bg-white/50 backdrop-blur-md dark:border-gray-800/50 dark:bg-gray-900/50">
-      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 mb-24 sm:mb-8 pointer-events-none">
+      <footer className="pointer-events-auto rounded-3xl border border-white/20 bg-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.08)] backdrop-blur-xl dark:border-gray-700/50 dark:bg-gray-900/60 px-6 py-10 sm:px-10">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand column */}
           <div className="sm:col-span-2 lg:col-span-1">
@@ -124,7 +124,7 @@ export function Footer() {
             Images are processed locally. Nothing is stored on our servers.
           </p>
         </div>
-      </div>
-    </footer>
+      </footer>
+    </div>
   );
 }

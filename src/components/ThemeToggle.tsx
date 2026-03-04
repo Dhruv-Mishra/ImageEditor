@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAppHaptics } from '@/lib/haptics';
 
 export function ThemeToggle() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const { vibrate } = useAppHaptics();
 
   useEffect(() => setMounted(true), []);
 
@@ -19,7 +21,10 @@ export function ThemeToggle() {
 
   return (
     <motion.button
-      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      onClick={() => {
+        vibrate('light');
+        setTheme(isDark ? 'light' : 'dark');
+      }}
       className="relative flex h-9 w-9 items-center justify-center rounded-full bg-gray-200/80 text-gray-700 backdrop-blur transition-colors hover:bg-gray-300/80 dark:bg-gray-700/80 dark:text-gray-200 dark:hover:bg-gray-600/80"
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.9 }}

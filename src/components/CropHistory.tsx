@@ -2,7 +2,6 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import type { HistoryEntry } from '@/lib/types';
-import { downloadBlob } from '@/lib/imageUtils';
 
 function formatTimeAgo(timestamp: number): string {
   const seconds = Math.floor((Date.now() - timestamp) / 1000);

@@ -4,6 +4,7 @@ import { ThemeProvider } from 'next-themes';
 import { Toaster } from 'sonner';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
+import { MobileNav } from '@/components/MobileNav';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -26,10 +27,11 @@ export default function RootLayout({
           {/* Premium Image Background */}
           <div className="bg-mesh-gradient"></div>
 
-          <div className="relative flex min-h-screen flex-col">
+          <div className="relative flex min-h-screen flex-col pb-16 sm:pb-0">
             <Header />
             <main className="flex-1">{children}</main>
             <Footer />
+            <MobileNav />
           </div>
           <Toaster position="bottom-center" richColors closeButton />
         </ThemeProvider>

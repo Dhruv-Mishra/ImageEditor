@@ -8,6 +8,7 @@ import { CropEditor } from '@/components/CropEditor';
 import { AspectRatioSelector } from '@/components/AspectRatioSelector';
 import { PhotoMarquee } from '@/components/PhotoMarquee';
 import { CropHistory } from '@/components/CropHistory';
+import Typewriter from 'typewriter-effect';
 import type {
   CropSuggestion,
   CropRegion,
@@ -22,6 +23,7 @@ import {
   generateThumbnailDataUrl,
 } from '@/lib/imageUtils';
 import { saveHistoryEntry, loadHistory, clearHistoryData } from '@/lib/db';
+import { useAppHaptics } from '@/lib/haptics';
 
 type AppState = 'idle' | 'uploading' | 'editing' | 'exporting';
 
@@ -32,6 +34,7 @@ const fadeVariants = {
 };
 
 export default function Home() {
+  const { vibrate } = useAppHaptics();
   const [appState, setAppState] = useState<AppState>('idle');
   const [fullResUrl, setFullResUrl] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -71,14 +74,28 @@ export default function Home() {
     loadHistory().then((data) => {
       if (data && data.length > 0) {
         setHistory(data);
+
+        // Handle loading entry from URL if returning from Archive page
+        const params = new URLSearchParams(window.location.search);
+        const loadId = params.get('load');
+        if (loadId) {
+          const entryToLoad = data.find(e => e.id === loadId);
+          if (entryToLoad) {
+            handleLoadFromHistory(entryToLoad);
+            // Clean up the URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        }
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ---- Upload & API call ----
 
   const handleImageSelected = useCallback(
     async (file: File) => {
+      vibrate('selection');
       setError(null);
       setAppState('uploading');
       setLastExportBlob(null);
@@ -126,7 +143,7 @@ export default function Home() {
         setAppState('idle');
       }
     },
-    [checkShareSupport],
+    [checkShareSupport, vibrate],
   );
 
   // ---- Crop interactions ----
@@ -136,18 +153,20 @@ export default function Home() {
   }, []);
 
   const handleResetToAi = useCallback(() => {
+    vibrate('light');
     if (aiSuggestion) {
       setCurrentCrop(aiSuggestion.cropRegion);
       setAspectRatio(aiSuggestion.aspectRatio as AspectRatioOption);
       setResetKey((k) => k + 1);
     }
-  }, [aiSuggestion]);
+  }, [aiSuggestion, vibrate]);
 
   // ---- Export ----
 
   const handleExport = useCallback(async () => {
     if (!currentCrop || !fullResUrl) return;
 
+    vibrate('success');
     setAppState('exporting');
     try {
       const fullResCrop = scaleToFullRes(currentCrop, scaleFactor);
@@ -175,12 +194,13 @@ export default function Home() {
     } finally {
       setAppState('editing');
     }
-  }, [currentCrop, fullResUrl, scaleFactor, history]);
+  }, [currentCrop, fullResUrl, scaleFactor, history, vibrate]);
 
   // ---- Sharing ----
 
   const handleCopyToClipboard = useCallback(async () => {
     if (!lastExportBlob) return;
+    vibrate('selection');
     try {
       await navigator.clipboard.write([
         new ClipboardItem({ [lastExportBlob.type]: lastExportBlob }),
@@ -189,10 +209,11 @@ export default function Home() {
     } catch {
       toast.error('Failed to copy. Try downloading instead.');
     }
-  }, [lastExportBlob]);
+  }, [lastExportBlob, vibrate]);
 
   const handleShare = useCallback(async () => {
     if (!lastExportBlob) return;
+    vibrate(30);
     try {
       const file = new File([lastExportBlob], 'cropped-portrait.jpg', {
         type: 'image/jpeg',
@@ -206,7 +227,7 @@ export default function Home() {
         toast.error('Sharing failed.');
       }
     }
-  }, [lastExportBlob]);
+  }, [lastExportBlob, vibrate]);
 
   // ---- History ----
 
@@ -231,6 +252,7 @@ export default function Home() {
   // ---- Start over ----
 
   const handleStartOver = useCallback(() => {
+    vibrate('heavy');
     if (fullResUrl) URL.revokeObjectURL(fullResUrl);
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setAppState('idle');
@@ -245,7 +267,7 @@ export default function Home() {
     setError(null);
     setResetKey(0);
     setLastExportBlob(null);
-  }, [fullResUrl, previewUrl]);
+  }, [fullResUrl, previewUrl, vibrate]);
 
   // ---- Render ----
 
@@ -286,11 +308,25 @@ export default function Home() {
                   initial={{ opacity: 0, filter: 'blur(8px)', y: 20 }}
                   animate={{ opacity: 1, filter: 'blur(0px)', y: 0 }}
                   transition={{ duration: 0.4, ease: 'easeOut' }}
-                  className="text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-6xl sm:leading-tight"
+                  className="text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-6xl sm:leading-tight min-h-[180px] sm:min-h-[180px] flex flex-col items-center justify-center pt-8"
                 >
-                  Perfect headshot crops,{' '}
-                  <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent dark:from-blue-400 dark:to-indigo-400">
-                    powered by AI
+                  <span className="pb-1">Perfect headshots,</span>
+                  <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent dark:from-blue-400 dark:to-indigo-400 mt-2 block min-h-[2.5em] sm:min-h-[1.5em] w-full max-w-[90vw] break-words leading-relaxed pb-3">
+                    <Typewriter
+                      options={{
+                        strings: [
+                          'powered by AI',
+                          'cropped magically',
+                          'for your resume',
+                          'in mere seconds',
+                          'ready for LinkedIn'
+                        ],
+                        autoStart: true,
+                        loop: true,
+                        delay: 50,
+                        deleteSpeed: 30,
+                      }}
+                    />
                   </span>
                 </motion.h1>
                 <motion.p
@@ -392,14 +428,6 @@ export default function Home() {
 
                   <div className="flex flex-wrap gap-2">
                     <motion.button
-                      onClick={handleStartOver}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="rounded-full border border-gray-300/50 bg-white/50 px-5 py-2.5 text-sm font-medium text-gray-700 shadow-sm backdrop-blur-sm transition-all hover:bg-gray-50 hover:shadow-md dark:border-gray-600/50 dark:bg-gray-800/50 dark:text-gray-200 dark:hover:bg-gray-700"
-                    >
-                      New Photo
-                    </motion.button>
-                    <motion.button
                       onClick={handleResetToAi}
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
@@ -418,6 +446,14 @@ export default function Home() {
                       {appState === 'exporting'
                         ? 'Exporting\u2026'
                         : 'Export'}
+                    </motion.button>
+                    <motion.button
+                      onClick={handleStartOver}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="rounded-full border border-red-300/50 bg-red-50 px-5 py-2.5 text-sm font-medium text-red-600 shadow-sm backdrop-blur-sm transition-all hover:bg-red-100/80 hover:shadow-md dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-400 dark:hover:bg-red-900/60"
+                    >
+                      Clear Image
                     </motion.button>
                   </div>
                 </div>
@@ -536,6 +572,17 @@ export default function Home() {
                     </span>
                   </div>
                 </motion.div>
+
+                {/* Inline Archive for Editor View */}
+                {history.length > 0 && (
+                  <div className="mt-8">
+                    <CropHistory
+                      entries={history}
+                      onSelect={handleLoadFromHistory}
+                      onClear={handleClearHistory}
+                    />
+                  </div>
+                )}
               </motion.div>
             )}
         </AnimatePresence>
@@ -554,13 +601,6 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* ---- Archive (Session & DB) ---- */}
-      <CropHistory
-        entries={history}
-        onSelect={handleLoadFromHistory}
-        onClear={handleClearHistory}
-      />
     </>
   );
 }

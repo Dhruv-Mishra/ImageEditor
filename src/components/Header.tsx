@@ -39,16 +39,22 @@ export function Header() {
         {/* Nav links centered perfectly */}
         <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-6 sm:flex" aria-label="Main navigation">
           <Link
-            href="/#archive"
+            href="/"
+            className="text-sm font-medium text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+          >
+            Home
+          </Link>
+          <Link
+            href="/archive"
             className="text-sm font-medium text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
           >
             Archive
           </Link>
           <Link
-            href="/#features"
+            href="/about"
             className="text-sm font-medium text-gray-600 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
           >
-            Features
+            About
           </Link>
         </nav>
 
