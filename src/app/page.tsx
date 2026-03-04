@@ -678,6 +678,11 @@ export default function Home() {
 
     // Scroll to top so the user sees the homepage hero
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Notify nav components that the session is gone
+    try {
+      window.dispatchEvent(new CustomEvent('cropai:session-changed'));
+    } catch { /* SSR guard */ }
   }, [fullResUrl, previewUrl, vibrate]);
 
   /** Navigate to idle view — session remains in IndexedDB for resume via Edit. */
@@ -836,11 +841,7 @@ export default function Home() {
           )}
 
           {/* ---- Editor ---- */}
-          {(appState === 'editing' || appState === 'exporting') &&
-            previewUrl &&
-            previewDimensions &&
-            currentCrop &&
-            multiSuggestion && (
+          {(appState === 'editing' || appState === 'exporting') && (
               <motion.div
                 key="editor"
                 variants={fadeVariants}
@@ -850,6 +851,8 @@ export default function Home() {
                 transition={{ duration: 0.25 }}
                 className="space-y-6"
               >
+                {previewUrl && previewDimensions && currentCrop && multiSuggestion && (
+                <>
                 <CropEditor
                   key={resetKey}
                   imageSrc={previewUrl}
@@ -1039,6 +1042,8 @@ export default function Home() {
                       onDelete={handleDeleteEntry}
                     />
                   </div>
+                )}
+                </>
                 )}
               </motion.div>
             )}
