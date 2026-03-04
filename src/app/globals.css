@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  @apply bg-gray-50 text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: hidden;
+  /* Prevent horizontal scroll from background elements */
+}
+
+/* Premium Image Background */
+.bg-mesh-gradient {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  overflow: hidden;
+  /* High quality abstract gradient image */
+  background-image: url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  /* Light mode overlay */
+  background-color: rgba(255, 255, 255, 0.6);
+  background-blend-mode: overlay;
+  transition: background-color 0.5s ease;
+}
+
+.dark .bg-mesh-gradient {
+  /* Dark mode overlay */
+  background-color: rgba(10, 10, 15, 0.85);
+  background-blend-mode: multiply;
+}
+
+/* react-image-crop dark mode overrides */
+.dark .ReactCrop__drag-handle {
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.dark .ReactCrop__rule-of-thirds-hz::before,
+.dark .ReactCrop__rule-of-thirds-hz::after,
+.dark .ReactCrop__rule-of-thirds-vt::before,
+.dark .ReactCrop__rule-of-thirds-vt::after {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Hide scrollbar but allow scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Smooth scroll for anchor links */
+html {
+  scroll-behavior: smooth;
+}

@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Bash",
+      "WebSearch"
+    ]
+  },
+  "agentDirectory": ".claude/agents",
+  "skillsDirectory": ".claude/skills",
+  "projectContext": {
+    "name": "Portrait Photo Cropper",
+    "type": "web-application",
+    "languages": ["TypeScript", "CSS"],
+    "frameworks": ["Next.js 14", "React 18", "Tailwind CSS 3"],
+    "description": "Single-page Next.js app: upload portrait photo → AI crop suggestion → interactive crop → export.",
+    "entryPoints": ["src/app/page.tsx", "src/app/api/crop-suggest/route.ts"],
+    "conventions": {
+      "components": "Functional, named exports, 'use client' for interactivity",
+      "styling": "Tailwind CSS utility classes",
+      "imports": "React/Next → external → internal → types → CSS",
+      "errors": "try-catch, typed JSON errors on API, toast on client",
+      "commits": "Conventional Commits (feat:, fix:, chore:)"
+    },
+    "commands": {
+      "dev": "npm run dev",
+      "build": "npm run build",
+      "lint": "npm run lint",
+      "format": "npm run format"
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  // Tool sets for multi-agent workflows
+  // Reference these in prompts with #toolset-name
+
+  "reader": {
+    "tools": ["search", "read", "codebase", "problems", "usages", "fetch"],
+    "description": "Read-only tools for exploration and analysis",
+    "icon": "book"
+  },
+
+  "writer": {
+    "tools": ["search", "read", "edit", "terminal", "fetch"],
+    "description": "Full read-write tools for implementation",
+    "icon": "edit"
+  },
+
+  "swarm": {
+    "tools": ["agent", "search", "read", "edit", "terminal", "fetch", "codebase", "problems", "usages", "changes"],
+    "description": "All tools needed for full multi-agent swarm execution",
+    "icon": "hubot"
+  }
+}
