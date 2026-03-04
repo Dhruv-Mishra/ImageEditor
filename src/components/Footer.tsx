@@ -50,7 +50,7 @@ export function Footer() {
                 </svg>
               </div>
               <span className="font-bold text-gray-900 dark:text-white">
-                CropAI
+                Cropio
               </span>
             </div>
             <p className="text-sm leading-relaxed text-gray-500 dark:text-gray-400">
@@ -133,7 +133,7 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-gray-200 pt-6 dark:border-gray-800 sm:flex-row">
           <p className="text-xs text-gray-400 dark:text-gray-500">
-            &copy; {new Date().getFullYear()} CropAI. All rights reserved.
+            &copy; {new Date().getFullYear()} Cropio. All rights reserved.
           </p>
           <p className="text-xs text-gray-400 dark:text-gray-500">
             Images are processed locally. Nothing is stored on our servers.

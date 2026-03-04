@@ -75,7 +75,7 @@ export function Header() {
             </svg>
           </div>
           <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-lg font-bold tracking-tight text-transparent dark:from-blue-400 dark:to-indigo-400">
-            CropAI
+            Cropio
           </span>
         </Link>
 

@@ -10,9 +10,50 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'CropAI — AI Portrait Photo Cropper',
+  title: {
+    default: 'Cropio — AI Portrait Photo Cropper',
+    template: '%s | Cropio',
+  },
   description:
-    'Upload a portrait photo, get an AI-suggested headshot crop, fine-tune it interactively, and export at full resolution.',
+    'Upload a portrait photo, get an AI-powered crop suggestion, fine-tune it interactively, and export at full resolution. Free, fast, and private.',
+  keywords: [
+    'portrait cropper',
+    'AI photo crop',
+    'headshot cropper',
+    'LinkedIn photo',
+    'resume photo',
+    'passport photo crop',
+    'portrait photo editor',
+    'free headshot tool',
+  ],
+  authors: [{ name: 'Cropio' }],
+  creator: 'Cropio',
+  metadataBase: new URL('https://cropio.app'),
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    siteName: 'Cropio',
+    title: 'Cropio — AI Portrait Photo Cropper',
+    description:
+      'Upload a portrait photo, get an AI-powered crop suggestion, fine-tune it interactively, and export at full resolution.',
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Cropio — AI Portrait Photo Cropper' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Cropio — AI Portrait Photo Cropper',
+    description:
+      'Upload a portrait, get an AI crop suggestion, fine-tune & export at full resolution.',
+    images: ['/og-image.png'],
+  },
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
+  manifest: '/site.webmanifest',
 };
 
 export default function RootLayout({

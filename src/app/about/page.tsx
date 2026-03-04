@@ -12,12 +12,12 @@ export default function AboutPage() {
                 className="rounded-3xl border border-white/20 bg-white/60 p-8 shadow-2xl backdrop-blur-xl dark:border-gray-700/50 dark:bg-gray-900/60 sm:p-12"
             >
                 <h1 className="mb-6 text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-5xl">
-                    About CropAI
+                    About Cropio
                 </h1>
 
                 <div className="prose prose-blue dark:prose-invert max-w-none text-gray-600 dark:text-gray-300">
                     <p className="text-lg leading-relaxed">
-                        Welcome to CropAI, a completely private, client-side tool designed to instantly
+                        Welcome to Cropio, a completely private, client-side tool designed to instantly
                         generate professional portrait crops powered by intelligent algorithms.
                     </p>
 
@@ -35,7 +35,7 @@ export default function AboutPage() {
                         How it works
                     </h2>
                     <p>
-                        CropAI leverages a sophisticated computer-vision approach to heuristically
+                        Cropio leverages a sophisticated computer-vision approach to heuristically
                         discover the optimal aspect ratio framing for subjects. By focusing on smart
                         rule-of-thirds intersections and golden-ratio body alignments, the tool outputs
                         crops that are instantly suitable for LinkedIn, professional portfolios, or Resumes.

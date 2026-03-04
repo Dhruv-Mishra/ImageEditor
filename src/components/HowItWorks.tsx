@@ -202,7 +202,7 @@ export function HowItWorks() {
             className="mb-12 text-center"
           >
             <h2 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-3xl">
-              Why CropAI?
+              Why Cropio?
             </h2>
             <p className="mt-3 text-gray-600 dark:text-gray-400">
               Everything you need for perfect portrait crops, nothing you don&apos;t.

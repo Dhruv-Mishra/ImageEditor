@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Transpile web-haptics so its ES2022+ class fields work on older iOS Safari
+  transpilePackages: ['web-haptics'],
   images: {
     remotePatterns: [
       {

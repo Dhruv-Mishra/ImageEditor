@@ -19,9 +19,10 @@ const BACKEND_HOST = '127.0.0.1';
 const BACKEND_PORT = 8000;
 const HEALTH_URL = `http://${BACKEND_HOST}:${BACKEND_PORT}/api/health`;
 const HEALTH_TIMEOUT_S = 60;
+const IS_WIN = process.platform === 'win32';
 
 // Detect python executable name (python3 on Unix, python on Windows)
-const PYTHON = process.platform === 'win32' ? 'python' : 'python3';
+const PYTHON = IS_WIN ? 'python' : 'python3';
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -85,11 +86,28 @@ function waitForHealth() {
 // ── Main ─────────────────────────────────────────────────────────────────
 
 const children = [];
+let exiting = false;
+
+/**
+ * Kill a child process tree.
+ * On Windows, `child.kill()` only kills the shell wrapper, leaving the real
+ * process alive. Use `taskkill /T /F /PID` to kill the entire tree.
+ */
+function killChild(child) {
+  if (!child || child.exitCode !== null) return; // already dead
+  try {
+    if (IS_WIN && child.pid) {
+      execSync(`taskkill /T /F /PID ${child.pid}`, { stdio: 'ignore' });
+    } else {
+      child.kill('SIGTERM');
+    }
+  } catch { /* already exited */ }
+}
 
 function cleanup() {
-  for (const child of children) {
-    try { child.kill(); } catch { /* ignore */ }
-  }
+  if (exiting) return;
+  exiting = true;
+  for (const child of children) killChild(child);
 }
 
 process.on('SIGINT', () => { cleanup(); process.exit(0); });
