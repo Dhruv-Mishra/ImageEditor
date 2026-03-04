@@ -123,27 +123,29 @@ export function CropEditor({
   // ---- render ----
 
   return (
-    <motion.div
-      className="relative inline-flex items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-white/80 shadow-2xl dark:border-gray-700/50 dark:bg-gray-900/80"
-      initial={{ opacity: 0, scale: 0.98, y: 10 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: 'easeOut' }}
-    >
-      <ReactCrop
-        crop={toPercentCrop(crop)}
-        onChange={handleCropChange}
-        onComplete={handleCropComplete}
-        aspect={ASPECT_RATIOS[aspectRatio]}
+    <div className="flex justify-center">
+      <motion.div
+        className="relative inline-flex items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-white/80 shadow-2xl dark:border-gray-700/50 dark:bg-gray-900/80"
+        initial={{ opacity: 0, scale: 0.98, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={imageSrc}
-          alt="Portrait photo with crop overlay"
-          draggable={false}
-          className="max-h-[75vh] w-auto"
-          style={{ maxWidth: '100%', display: 'block' }}
-        />
-      </ReactCrop>
-    </motion.div>
+        <ReactCrop
+          crop={toPercentCrop(crop)}
+          onChange={handleCropChange}
+          onComplete={handleCropComplete}
+          aspect={ASPECT_RATIOS[aspectRatio]}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={imageSrc}
+            alt="Portrait photo with crop overlay"
+            draggable={false}
+            className="max-h-[75vh] w-auto"
+            style={{ maxWidth: '100%', display: 'block' }}
+          />
+        </ReactCrop>
+      </motion.div>
+    </div>
   );
 }

@@ -28,15 +28,22 @@ export async function POST(request: NextRequest) {
       model: 'mistralai/ministral-14b-instruct-2512',
       messages: [
         {
-          role: 'system',
-          content: 'You describe photos in plain text only. Never use markdown formatting (no headers, bold, italic, bullet points, or code blocks). Never use emojis. Write exactly 2-3 concise sentences as a single paragraph.',
-        },
-        {
           role: 'user',
-          content: `Describe this portrait photo. Focus on the person's appearance, clothing, pose, expression, and background. Write 2-3 plain sentences, no markdown, no emojis. <img src="data:${mimeType};base64,${base64}" />`,
+          content: [
+            {
+              type: 'text',
+              text: 'Describe this image concisely in 2-3 plain text sentences. Do not use markdown, bullet points, or emojis.',
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${base64}`,
+              },
+            },
+          ],
         },
       ],
-      max_tokens: 384,
+      max_tokens: 512,
       temperature: 0.15,
       top_p: 1.0,
       frequency_penalty: 0.0,
@@ -64,25 +71,8 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await response.json();
-    let description =
+    const description =
       data.choices?.[0]?.message?.content?.trim() ?? 'No description generated.';
-
-    // Strip any markdown formatting the model might have added
-    description = description
-      .replace(/#{1,6}\s*/g, '')           // headers
-      .replace(/\*{1,3}([^*]+)\*{1,3}/g, '$1') // bold/italic
-      .replace(/__([^_]+)__/g, '$1')       // alt bold
-      .replace(/_([^_]+)_/g, '$1')         // alt italic
-      .replace(/`([^`]+)`/g, '$1')         // inline code
-      .replace(/```[\s\S]*?```/g, '')      // code blocks
-      .replace(/^[\s]*[-*+]\s/gm, '')      // bullet points
-      .replace(/^\d+\.\s/gm, '')           // numbered lists
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // links
-      .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '') // emojis
-      .replace(/\n{2,}/g, ' ')             // collapse multiple newlines
-      .replace(/\n/g, ' ')                 // single newlines to spaces
-      .replace(/\s{2,}/g, ' ')             // collapse multiple spaces
-      .trim();
 
     return NextResponse.json({ description });
   } catch (err) {

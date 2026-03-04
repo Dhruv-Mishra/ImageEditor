@@ -110,6 +110,7 @@ export default function EditPage() {
   const [aiDescription, setAiDescription] = useState<string | null>(null);
   const [aiDescriptionLoading, setAiDescriptionLoading] = useState(false);
   const [typewriterText, setTypewriterText] = useState('');
+  const [skipTypewriter, setSkipTypewriter] = useState(false);
   const typewriterIndexRef = useRef(0);
   const descriptionRequestedRef = useRef(false);
   const fillerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -206,13 +207,13 @@ export default function EditPage() {
       const lowResBlob = await new Promise<Blob>((resolve, reject) => {
         canvas.toBlob(
           (b) => (b ? resolve(b) : reject(new Error('Failed to create low-res blob'))),
-          'image/jpeg',
-          0.7,
+          'image/webp',
+          0.75,
         );
       });
 
       const formData = new FormData();
-      formData.append('image', lowResBlob, 'preview.jpg');
+      formData.append('image', lowResBlob, 'preview.webp');
 
       // Fetch with 60 second timeout
       const controller = new AbortController();
@@ -247,8 +248,15 @@ export default function EditPage() {
   }, [startFillerAnimation, stopFillerAnimation]);
 
   // Typewriter effect: once description arrives, type it character-by-character
+  // Unless skipTypewriter is set (active session restore)
   useEffect(() => {
     if (!aiDescription) return;
+
+    if (skipTypewriter) {
+      setTypewriterText(aiDescription);
+      return;
+    }
+
     typewriterIndexRef.current = 0;
     setTypewriterText('');
 
@@ -262,7 +270,7 @@ export default function EditPage() {
     }, 20);
 
     return () => clearInterval(interval);
-  }, [aiDescription]);
+  }, [aiDescription, skipTypewriter]);
 
   // Clean up filler timers on unmount
   useEffect(() => {
@@ -466,6 +474,7 @@ export default function EditPage() {
       setLastExportBlob(null);
       // Restore AI description if available from the session
       if (session.aiDescription) {
+        setSkipTypewriter(true);
         setAiDescription(session.aiDescription);
         descriptionRequestedRef.current = true;
       } else {
@@ -475,6 +484,7 @@ export default function EditPage() {
         const existingVector = await loadVectorEntry(session.id);
         if (existingVector) {
           // We have the vector entry — just restore the description from it
+          setSkipTypewriter(true);
           setAiDescription(existingVector.description);
           descriptionRequestedRef.current = true;
           // Also update the session so it caches the description for next time
@@ -657,6 +667,7 @@ export default function EditPage() {
         descriptionRequestedRef.current = false;
         setAiDescription(null);
         setTypewriterText('');
+        setSkipTypewriter(false);
         const currentSessionId = sessionIdRef.current;
         generateDescription(file).then((desc) => {
           if (desc && currentSessionId) {
@@ -1081,12 +1092,12 @@ export default function EditPage() {
                 <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
                 </svg>
-                <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300 font-mono">
+                <div className="text-sm leading-relaxed text-gray-600 dark:text-gray-300">
                   {typewriterText}
                   {typewriterText.length < aiDescription.length && (
                     <span className="inline-block w-0.5 h-4 ml-0.5 align-text-bottom bg-blue-500 animate-pulse" />
                   )}
-                </p>
+                </div>
               </div>
             ) : (
               <p className="text-sm text-gray-400 dark:text-gray-500 italic">AI description unavailable</p>
