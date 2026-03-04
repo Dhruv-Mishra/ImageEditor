@@ -19,6 +19,25 @@ export interface CropSuggestion {
   confidence: number;
 }
 
+/** The four AI-generated crop types */
+export type CropType = 'face' | 'portrait' | 'fullbody' | 'slightly_far';
+
+/** A single crop variant with its type label */
+export interface CropVariant {
+  type: CropType;
+  label: string;
+  cropRegion: CropRegion;
+  aspectRatio: string;
+  confidence: number;
+}
+
+/** Response shape with multiple crop suggestions */
+export interface MultiCropSuggestion {
+  crops: CropVariant[];
+  /** The recommended/default crop type */
+  defaultType: CropType;
+}
+
 export type AspectRatioOption = '1:1' | '3:4' | '4:5' | 'free';
 
 /** Downscaled preview image with metadata for full-res reconstruction. */

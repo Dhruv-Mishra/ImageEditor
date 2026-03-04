@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
-import { generateCropSuggestion } from '@/lib/cropHeuristic';
+import { generateMultiCropSuggestions } from '@/lib/cropHeuristic';
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,8 +46,8 @@ export async function POST(request: NextRequest) {
     // Simulate AI processing latency
     await new Promise((resolve) => setTimeout(resolve, 400));
 
-    // Generate deterministic crop suggestion
-    const suggestion = generateCropSuggestion(metadata.width, metadata.height);
+    // Generate all crop variants
+    const suggestion = generateMultiCropSuggestions(metadata.width, metadata.height);
 
     return NextResponse.json(suggestion);
   } catch (error) {

@@ -61,3 +61,17 @@ export async function clearHistoryData(): Promise<void> {
         console.error('Failed to clear history from IndexedDB', err);
     }
 }
+
+export async function deleteHistoryEntry(id: string): Promise<void> {
+    try {
+        const db = await getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            tx.objectStore(STORE_NAME).delete(id);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    } catch (err) {
+        console.error('Failed to delete history entry from IndexedDB', err);
+    }
+}

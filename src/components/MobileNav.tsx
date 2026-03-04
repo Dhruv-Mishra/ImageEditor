@@ -9,8 +9,8 @@ export function MobileNav() {
     const { vibrate } = useAppHaptics();
 
     return (
-        <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl border-t border-gray-200/50 dark:border-gray-800/50 pb-safe shadow-[0_-8px_30px_rgba(0,0,0,0.05)] dark:shadow-[0_-8px_30px_rgba(0,0,0,0.2)]">
-            <div className="flex items-center justify-around h-16 px-4">
+        <div className="sm:hidden fixed bottom-4 left-4 right-4 z-50 pb-safe">
+            <div className="flex items-center justify-around h-16 px-2 rounded-full border border-white/20 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-xl dark:border-gray-700/50 dark:bg-gray-900/80">
                 <Link
                     href="/"
                     onClick={() => vibrate('light')}

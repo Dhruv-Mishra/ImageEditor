@@ -15,7 +15,7 @@ const portraits = [
 
 export function PhotoMarquee() {
     return (
-        <div className="w-full relative overflow-hidden bg-white/40 dark:bg-black/40 backdrop-blur-sm py-12 sm:py-16 my-8 shadow-sm dark:shadow-xl border-y border-gray-200/50 dark:border-white/5 opacity-80 hover:opacity-100 transition-all duration-500">
+        <div className="w-full relative overflow-hidden bg-white/70 dark:bg-black/60 backdrop-blur-sm py-12 sm:py-16 my-8 shadow-sm dark:shadow-xl border-y border-gray-200/50 dark:border-white/5 opacity-90 transition-all duration-500">
             {/* Top Film Sprockets */}
             <div className="absolute top-2 left-0 right-0 h-4 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSIyMCI+PHJlY3QgeD0iMTYiIHk9IjQiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxMiIgZmlsbD0iIzAwMDAwMCIgb3BhY2l0eT0iMC4xIiByeD0iMiIvPjwvc3ZnPg==')] dark:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSIyMCI+PHJlY3QgeD0iMTYiIHk9IjQiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxMiIgZmlsbD0iI2ZmZmZmZiIgb3BhY2l0eT0iMC4yNSIgcng9IjIiLz48L3N2Zz4=')] bg-repeat-x transition-all" />
 
@@ -38,15 +38,17 @@ export function PhotoMarquee() {
                             {portraits.map((src, idx) => (
                                 <div
                                     key={`${blockIdx}-${idx}`}
-                                    className="relative aspect-[3/4] h-56 sm:h-64 flex-shrink-0 overflow-hidden rounded-md border border-gray-200/50 dark:border-white/10 shadow-sm dark:shadow-lg dark:border-gray-800 transition-colors"
+                                    className="group relative aspect-[3/4] h-56 sm:h-64 flex-shrink-0 overflow-visible transition-colors"
                                 >
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
-                                        src={src}
-                                        alt={`Professional portrait sample ${idx}`}
-                                        className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
-                                        draggable={false}
-                                    />
+                                    <div className="h-full w-full overflow-hidden rounded-2xl border border-gray-200/50 dark:border-white/10 shadow-sm dark:shadow-lg dark:border-gray-800">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                            src={src}
+                                            alt={`Professional portrait sample ${idx}`}
+                                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                            draggable={false}
+                                        />
+                                    </div>
                                 </div>
                             ))}
                         </div>

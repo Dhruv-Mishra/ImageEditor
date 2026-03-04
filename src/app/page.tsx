@@ -6,14 +6,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { UploadZone } from '@/components/UploadZone';
 import { CropEditor } from '@/components/CropEditor';
 import { AspectRatioSelector } from '@/components/AspectRatioSelector';
+import { CropTypeSelector } from '@/components/CropTypeSelector';
 import { PhotoMarquee } from '@/components/PhotoMarquee';
 import { CropHistory } from '@/components/CropHistory';
 import Typewriter from 'typewriter-effect';
 import type {
-  CropSuggestion,
   CropRegion,
   AspectRatioOption,
   HistoryEntry,
+  MultiCropSuggestion,
+  CropVariant,
+  CropType,
 } from '@/lib/types';
 import {
   cropImage,
@@ -22,7 +25,7 @@ import {
   scaleToFullRes,
   generateThumbnailDataUrl,
 } from '@/lib/imageUtils';
-import { saveHistoryEntry, loadHistory, clearHistoryData } from '@/lib/db';
+import { saveHistoryEntry, loadHistory, clearHistoryData, deleteHistoryEntry } from '@/lib/db';
 import { useAppHaptics } from '@/lib/haptics';
 
 type AppState = 'idle' | 'uploading' | 'editing' | 'exporting';
@@ -47,9 +50,8 @@ export default function Home() {
     width: number;
     height: number;
   } | null>(null);
-  const [aiSuggestion, setAiSuggestion] = useState<CropSuggestion | null>(
-    null,
-  );
+  const [multiSuggestion, setMultiSuggestion] = useState<MultiCropSuggestion | null>(null);
+  const [selectedCropType, setSelectedCropType] = useState<CropType>('portrait');
   const [currentCrop, setCurrentCrop] = useState<CropRegion | null>(null);
   const [aspectRatio, setAspectRatio] = useState<AspectRatioOption>('3:4');
   const [error, setError] = useState<string | null>(null);
@@ -130,10 +132,14 @@ export default function Home() {
           throw new Error(data.error || 'Failed to get crop suggestion');
         }
 
-        const suggestion: CropSuggestion = await response.json();
-        setAiSuggestion(suggestion);
-        setCurrentCrop(suggestion.cropRegion);
-        setAspectRatio(suggestion.aspectRatio as AspectRatioOption);
+        const multiResponse: MultiCropSuggestion = await response.json();
+        setMultiSuggestion(multiResponse);
+
+        // Find the default crop variant
+        const defaultCrop = multiResponse.crops.find(c => c.type === multiResponse.defaultType) ?? multiResponse.crops[0];
+        setSelectedCropType(defaultCrop.type);
+        setCurrentCrop(defaultCrop.cropRegion);
+        setAspectRatio(defaultCrop.aspectRatio as AspectRatioOption);
         setResetKey(0);
         setAppState('editing');
       } catch (err) {
@@ -154,12 +160,20 @@ export default function Home() {
 
   const handleResetToAi = useCallback(() => {
     vibrate('light');
-    if (aiSuggestion) {
-      setCurrentCrop(aiSuggestion.cropRegion);
-      setAspectRatio(aiSuggestion.aspectRatio as AspectRatioOption);
+    if (multiSuggestion) {
+      const defaultCrop = multiSuggestion.crops.find(c => c.type === selectedCropType) ?? multiSuggestion.crops[0];
+      setCurrentCrop(defaultCrop.cropRegion);
+      setAspectRatio(defaultCrop.aspectRatio as AspectRatioOption);
       setResetKey((k) => k + 1);
     }
-  }, [aiSuggestion, vibrate]);
+  }, [multiSuggestion, selectedCropType, vibrate]);
+
+  const handleSelectCropType = useCallback((crop: CropVariant) => {
+    setSelectedCropType(crop.type);
+    setCurrentCrop(crop.cropRegion);
+    setAspectRatio(crop.aspectRatio as AspectRatioOption);
+    setResetKey((k) => k + 1);
+  }, []);
 
   // ---- Export ----
 
@@ -236,6 +250,12 @@ export default function Home() {
     setHistory([]);
   }, []);
 
+  const handleDeleteEntry = useCallback(async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await deleteHistoryEntry(id);
+    setHistory((prev) => prev.filter((entry) => entry.id !== id));
+  }, []);
+
   const handleLoadFromHistory = useCallback(
     (entry: HistoryEntry) => {
       // Reconstitute the blob as a File and pass it exactly as if the user dragged it
@@ -261,7 +281,8 @@ export default function Home() {
     setScaleFactor(1);
     setNaturalDimensions(null);
     setPreviewDimensions(null);
-    setAiSuggestion(null);
+    setMultiSuggestion(null);
+    setSelectedCropType('portrait');
     setCurrentCrop(null);
     setAspectRatio('3:4');
     setError(null);
@@ -399,7 +420,7 @@ export default function Home() {
             previewUrl &&
             previewDimensions &&
             currentCrop &&
-            aiSuggestion && (
+            multiSuggestion && (
               <motion.div
                 key="editor"
                 variants={fadeVariants}
@@ -414,9 +435,19 @@ export default function Home() {
                   imageSrc={previewUrl}
                   naturalWidth={previewDimensions.width}
                   naturalHeight={previewDimensions.height}
-                  initialCrop={aiSuggestion.cropRegion}
+                  initialCrop={currentCrop}
                   aspectRatio={aspectRatio}
                   onCropChange={handleCropChange}
+                />
+
+                {/* Crop type thumbnails bar */}
+                <CropTypeSelector
+                  crops={multiSuggestion.crops}
+                  selectedType={selectedCropType}
+                  imageSrc={previewUrl}
+                  imageWidth={previewDimensions.width}
+                  imageHeight={previewDimensions.height}
+                  onSelectCrop={handleSelectCropType}
                 />
 
                 {/* Floating Controls bar */}
@@ -568,7 +599,7 @@ export default function Home() {
                     )}
                     <span className="text-blue-500">
                       AI confidence:{' '}
-                      {Math.round(aiSuggestion.confidence * 100)}%
+                      {Math.round((multiSuggestion.crops.find(c => c.type === selectedCropType)?.confidence ?? 0.85) * 100)}%
                     </span>
                   </div>
                 </motion.div>
@@ -580,6 +611,7 @@ export default function Home() {
                       entries={history}
                       onSelect={handleLoadFromHistory}
                       onClear={handleClearHistory}
+                      onDelete={handleDeleteEntry}
                     />
                   </div>
                 )}
