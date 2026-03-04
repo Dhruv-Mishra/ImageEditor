@@ -17,28 +17,31 @@ export default function AboutPage() {
 
                 <div className="prose prose-blue dark:prose-invert max-w-none text-gray-600 dark:text-gray-300">
                     <p className="text-lg leading-relaxed">
-                        Welcome to Cropio, a completely private, client-side tool designed to instantly
-                        generate professional portrait crops powered by intelligent algorithms.
+                        Cropio is a free, AI-powered portrait cropping tool that instantly generates
+                        professional headshot crops using real-time pose detection.
                     </p>
 
                     <h2 className="mt-8 mb-4 text-2xl font-bold text-gray-900 dark:text-white">
-                        100% Privacy by Design
+                        Your Privacy Matters
                     </h2>
                     <p>
-                        Unlike other AI services, every single image you upload and crop on this
-                        platform is processed purely inside your device&apos;s browser memory. Your images
-                        are <strong>never</strong> uploaded to any external server, ensuring complete
-                        peace of mind regarding your personal data and likeness.
+                        Your uploaded images are only used momentarily for AI analysis and are{' '}
+                        <strong>never stored on our servers</strong>. A lightweight, downscaled
+                        preview is processed by our AI to generate crop suggestions, and the final
+                        full-resolution crop and export happen entirely in your browser using the
+                        Canvas API. Nothing is saved after you leave the page.
                     </p>
 
                     <h2 className="mt-8 mb-4 text-2xl font-bold text-gray-900 dark:text-white">
-                        How it works
+                        How It Works
                     </h2>
                     <p>
-                        Cropio leverages a sophisticated computer-vision approach to heuristically
-                        discover the optimal aspect ratio framing for subjects. By focusing on smart
-                        rule-of-thirds intersections and golden-ratio body alignments, the tool outputs
-                        crops that are instantly suitable for LinkedIn, professional portfolios, or Resumes.
+                        Upload a portrait and our AI runs{' '}
+                        <strong>YOLOv11 pose estimation</strong> to detect body keypoints. From those
+                        keypoints, it computes optimal crop regions for face close-ups, portrait,
+                        and full-body framings. You can then fine-tune the crop interactively and
+                        export at the original full resolution — ideal for LinkedIn, resumes,
+                        passports, or professional portfolios.
                     </p>
 
                     <div className="mt-10 rounded-2xl bg-blue-50 p-6 dark:bg-blue-900/20">
@@ -46,12 +49,37 @@ export default function AboutPage() {
                             Tech Stack
                         </h3>
                         <ul className="list-inside list-disc space-y-2 text-blue-800 dark:text-blue-200">
-                            <li>Next.js App Router for dynamic rendering</li>
+                            <li>Next.js 14 App Router + React 19</li>
+                            <li>FastAPI + Ultralytics YOLOv11 (pose) backend</li>
                             <li>Framer Motion for fluid layout animations</li>
-                            <li>React-Image-Crop for robust HTML5 canvas manipulation</li>
-                            <li>IndexedDB for persistent client-side caching of exports</li>
-                            <li>Web-Haptics API for native sensory mobile touch</li>
+                            <li>React-Image-Crop for interactive canvas manipulation</li>
+                            <li>IndexedDB for persistent client-side crop archive</li>
+                            <li>Web Vibration API for native haptic feedback on mobile</li>
+                            <li>Tailwind CSS + dark mode via next-themes</li>
                         </ul>
+                    </div>
+
+                    <div className="mt-8 flex items-center gap-4">
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                            Built by{' '}
+                            <a
+                                href="https://github.com/Dhruv-Mishra"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-blue-600 underline decoration-blue-300 underline-offset-2 transition-colors hover:text-blue-800 dark:text-blue-400 dark:decoration-blue-700 dark:hover:text-blue-300"
+                            >
+                                Dhruv Mishra
+                            </a>
+                            {' · '}
+                            <a
+                                href="https://github.com/Dhruv-Mishra/ImageEditor"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-blue-600 underline decoration-blue-300 underline-offset-2 transition-colors hover:text-blue-800 dark:text-blue-400 dark:decoration-blue-700 dark:hover:text-blue-300"
+                            >
+                                View on GitHub
+                            </a>
+                        </p>
                     </div>
                 </div>
             </motion.div>
