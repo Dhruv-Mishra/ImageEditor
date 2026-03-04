@@ -37,6 +37,11 @@ const nextConfig = {
       },
     ];
   },
+  // Expose env vars to server-side API routes
+  serverRuntimeConfig: {
+    NVIDIA_VISION_API_KEY: process.env.NVIDIA_VISION_API_KEY,
+    NVIDIA_EMBED_API_KEY: process.env.NVIDIA_EMBED_API_KEY,
+  },
 };
 
 export default nextConfig;

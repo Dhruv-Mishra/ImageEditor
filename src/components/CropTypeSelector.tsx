@@ -109,8 +109,8 @@ export function CropTypeSelector({
                 />
               </div>
 
-              {/* Label + confidence */}
-              <div className="relative z-10 flex flex-col items-center gap-0.5">
+              {/* Label */}
+              <div className="relative z-10 flex flex-col items-center">
                 <span
                   className={`text-[10px] font-bold uppercase tracking-wider transition-colors duration-200 ${
                     isSelected
@@ -119,15 +119,6 @@ export function CropTypeSelector({
                   }`}
                 >
                   {crop.label}
-                </span>
-                <span
-                  className={`text-[8px] tabular-nums transition-colors duration-200 ${
-                    isSelected
-                      ? 'text-blue-500/80 dark:text-blue-300/70'
-                      : 'text-gray-400 dark:text-gray-500'
-                  }`}
-                >
-                  {Math.round(crop.confidence * 100)}%
                 </span>
               </div>
             </button>

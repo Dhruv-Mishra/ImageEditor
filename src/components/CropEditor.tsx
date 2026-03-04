@@ -124,27 +124,23 @@ export function CropEditor({
 
   return (
     <motion.div
-      className="relative flex items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-white/80 p-2 shadow-2xl dark:border-gray-700/50 dark:bg-gray-900/80 sm:p-4"
+      className="relative inline-flex items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-white/80 shadow-2xl dark:border-gray-700/50 dark:bg-gray-900/80"
       initial={{ opacity: 0, scale: 0.98, y: 10 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
     >
-      {/* Premium subtle inner glow */}
-      <div className="pointer-events-none absolute inset-0 rounded-2xl shadow-[inset_0_0_20px_rgba(255,255,255,0.2)] dark:shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]" />
-
       <ReactCrop
         crop={toPercentCrop(crop)}
         onChange={handleCropChange}
         onComplete={handleCropComplete}
         aspect={ASPECT_RATIOS[aspectRatio]}
-        ruleOfThirds
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageSrc}
           alt="Portrait photo with crop overlay"
           draggable={false}
-          className="max-h-[70vh] w-auto rounded-lg shadow-inner"
+          className="max-h-[75vh] w-auto"
           style={{ maxWidth: '100%', display: 'block' }}
         />
       </ReactCrop>

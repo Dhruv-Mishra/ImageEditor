@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CropHistory } from '@/components/CropHistory';
 import { loadHistory, clearHistoryData, deleteHistoryEntry, loadAllSessions, clearSession } from '@/lib/db';
+import { searchByEmbedding, searchByTags, type VectorSearchResult } from '@/lib/vectorDb';
 import type { HistoryEntry, SessionData } from '@/lib/types';
 import { useAppHaptics } from '@/lib/haptics';
 
@@ -284,6 +285,13 @@ export default function ArchivePage() {
     const [filterSize, setFilterSize] = useState('all');
     const [filterDate, setFilterDate] = useState('all');
 
+    // Search state
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<VectorSearchResult[] | null>(null);
+    const [isSearching, setIsSearching] = useState(false);
+    const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastSearchQueryRef = useRef('');
+
     const router = useRouter();
     const { vibrate } = useAppHaptics();
 
@@ -340,6 +348,82 @@ export default function ArchivePage() {
         },
         [vibrate],
     );
+
+    /* ---- Semantic search (button-triggered) & tag search (on type) ---- */
+    const performAISearch = useCallback(async () => {
+        if (!searchQuery.trim()) return;
+
+        setIsSearching(true);
+        try {
+            const embedResponse = await fetch('/api/embed', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: searchQuery, inputType: 'query' }),
+            });
+
+            if (embedResponse.ok) {
+                const { embedding } = await embedResponse.json();
+                if (embedding && embedding.length > 0) {
+                    const results = await searchByEmbedding(embedding, 20, 0.25);
+                    setSearchResults(results);
+                    setIsSearching(false);
+                    return;
+                }
+            }
+
+            // Fallback to tag search
+            const tagResults = await searchByTags(searchQuery);
+            setSearchResults(tagResults);
+        } catch {
+            const tagResults = await searchByTags(searchQuery);
+            setSearchResults(tagResults);
+        } finally {
+            setIsSearching(false);
+        }
+    }, [searchQuery]);
+
+    const performTagSearch = useCallback(async (query: string) => {
+        if (!query.trim()) {
+            setSearchResults(null);
+            return;
+        }
+        const tagResults = await searchByTags(query);
+        setSearchResults(tagResults.length > 0 ? tagResults : null);
+    }, []);
+
+    const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const query = e.target.value;
+        setSearchQuery(query);
+
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+
+        if (!query.trim()) {
+            setSearchResults(null);
+            lastSearchQueryRef.current = '';
+            return;
+        }
+
+        // Debounced tag-based search while typing
+        searchDebounceRef.current = setTimeout(() => {
+            lastSearchQueryRef.current = query;
+            performTagSearch(query);
+        }, 300);
+    }, [performTagSearch]);
+
+    const handleSearchKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter' && searchQuery.trim()) {
+            e.preventDefault();
+            performAISearch();
+        }
+    }, [searchQuery, performAISearch]);
+
+    const clearSearch = useCallback(() => {
+        setSearchQuery('');
+        setSearchResults(null);
+        setIsSearching(false);
+        lastSearchQueryRef.current = '';
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    }, []);
 
     /* ---- build filtered + sorted list ---- */
     const filteredHistory = useMemo(() => {
@@ -398,6 +482,33 @@ export default function ArchivePage() {
         return result;
     }, [history, filterAspect, filterFormat, filterSize, filterDate, sortBy]);
 
+    /* ---- Apply search results as a filter on top ---- */
+    const displayHistory = useMemo(() => {
+        if (!searchResults) return filteredHistory;
+        const searchIds = new Set(searchResults.map((r) => r.id));
+        // Preserve search relevance ordering
+        const idOrder = new Map(searchResults.map((r, i) => [r.id, i]));
+        return filteredHistory
+            .filter((item) => searchIds.has(item.id))
+            .sort((a, b) => (idOrder.get(a.id) ?? 999) - (idOrder.get(b.id) ?? 999));
+    }, [filteredHistory, searchResults]);
+
+    /* ---- Filter sessions by search results too ---- */
+    const displaySessions = useMemo(() => {
+        if (!searchResults) return sessions;
+        const searchIds = new Set(searchResults.map((r) => r.id));
+        const idOrder = new Map(searchResults.map((r, i) => [r.id, i]));
+        return sessions
+            .filter((s) => searchIds.has(s.id))
+            .sort((a, b) => (idOrder.get(a.id) ?? 999) - (idOrder.get(b.id) ?? 999));
+    }, [sessions, searchResults]);
+
+    /* ---- Actual visible match count (for display) ---- */
+    const visibleMatchCount = useMemo(() => {
+        if (!searchResults) return 0;
+        return displayHistory.length + displaySessions.length;
+    }, [searchResults, displayHistory, displaySessions]);
+
     /* ---- active-filter count (for the reset button) ---- */
     const activeFilterCount = [filterAspect, filterFormat, filterSize, filterDate].filter(
         (v) => v !== 'all'
@@ -422,6 +533,94 @@ export default function ArchivePage() {
                 <p className="mx-auto mt-4 max-w-2xl text-lg text-gray-600 dark:text-gray-400">
                     Revisit and re-edit your previous professional portrait exports.
                 </p>
+
+                {/* Search bar */}
+                <div className="mx-auto mt-8 max-w-2xl">
+                    <div className="relative flex items-center gap-2">
+                        {/* Input with icon */}
+                        <div className="relative flex-1">
+                            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
+                                <svg className="h-5 w-5 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                                </svg>
+                            </div>
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={handleSearchChange}
+                                onKeyDown={handleSearchKeyDown}
+                                placeholder="Search your portraits..."
+                                className="w-full rounded-2xl border border-gray-200/60 bg-white/70 py-3.5 pl-12 pr-10
+                                           text-sm text-gray-800 placeholder-gray-400 shadow-sm backdrop-blur-xl
+                                           transition-all duration-200
+                                           focus:border-blue-400/60 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:shadow-md
+                                           dark:border-gray-700/60 dark:bg-gray-900/70 dark:text-gray-100
+                                           dark:placeholder-gray-500 dark:focus:border-blue-500/60 dark:focus:ring-blue-500/10"
+                                aria-label="Search exported images"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={clearSearch}
+                                    className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-gray-400
+                                               transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+                                    aria-label="Clear search"
+                                >
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
+
+                        {/* AI Search button */}
+                        <button
+                            onClick={performAISearch}
+                            disabled={!searchQuery.trim() || isSearching}
+                            className="group flex items-center gap-2 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600
+                                       px-5 py-3.5 text-sm font-semibold text-white shadow-md shadow-blue-500/20
+                                       transition-all duration-200
+                                       hover:scale-[1.03] hover:shadow-lg hover:shadow-blue-500/30
+                                       active:scale-[0.97]
+                                       disabled:opacity-40 disabled:hover:scale-100 disabled:hover:shadow-md disabled:cursor-not-allowed
+                                       dark:from-blue-500 dark:to-indigo-500 dark:shadow-blue-600/20"
+                            aria-label="Search with AI"
+                        >
+                            {isSearching ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                            ) : (
+                                <svg className="h-4 w-4 transition-transform duration-200 group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                                </svg>
+                            )}
+                            <span className="hidden sm:inline">{isSearching ? 'Searching...' : 'Search with AI'}</span>
+                        </button>
+                    </div>
+
+                    {/* Results indicator */}
+                    <AnimatePresence>
+                        {searchResults !== null && (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                transition={{ duration: 0.2 }}
+                                className="mt-3 flex justify-center"
+                            >
+                                <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium backdrop-blur-sm ${
+                                    visibleMatchCount > 0
+                                        ? 'bg-blue-50/80 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                                        : 'bg-gray-100/80 text-gray-500 dark:bg-gray-800/50 dark:text-gray-400'
+                                }`}>
+                                    {visibleMatchCount === 0 ? (
+                                        <>No matches found</>
+                                    ) : (
+                                        <>{visibleMatchCount} match{visibleMatchCount !== 1 ? 'es' : ''}</>
+                                    )}
+                                </span>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
             </div>
 
             {/* Filter bar */}
@@ -490,13 +689,13 @@ export default function ArchivePage() {
             )}
 
             {/* Active Sessions */}
-            {sessions.length > 0 && (
+            {displaySessions.length > 0 && (
                 <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 mb-10">
                     <h2 className="mb-4 text-lg font-bold text-gray-900 dark:text-white">
                         Saved Sessions
                     </h2>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                        {sessions.map((session) => (
+                        {displaySessions.map((session) => (
                             <motion.div
                                 key={session.id}
                                 initial={{ opacity: 0, scale: 0.95 }}
@@ -562,16 +761,18 @@ export default function ArchivePage() {
             )}
 
             {/* Export History */}
-            {filteredHistory.length > 0 ? (
+            {displayHistory.length > 0 ? (
                 <CropHistory
-                    entries={filteredHistory}
+                    entries={displayHistory}
                     onSelect={handleSelect}
                     onClear={handleClearHistory}
                     onDelete={handleDelete}
                 />
-            ) : history.length > 0 && filteredHistory.length === 0 ? (
+            ) : history.length > 0 && displayHistory.length === 0 ? (
                 <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 text-center py-20">
-                    <p className="text-gray-500 dark:text-gray-400">No exports match your current filters.</p>
+                    <p className="text-gray-500 dark:text-gray-400">
+                        {searchQuery ? 'No exports match your search.' : 'No exports match your current filters.'}
+                    </p>
                 </div>
             ) : sessions.length === 0 ? (
                 <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 text-center py-20">

@@ -50,6 +50,13 @@ import {
 } from '@/lib/db';
 import { consumePendingUpload } from '@/lib/pendingUpload';
 import { useAppHaptics } from '@/lib/haptics';
+import {
+  saveVectorEntry,
+  loadVectorEntry,
+  extractTags,
+  composeEmbeddingText,
+  type VectorEntry,
+} from '@/lib/vectorDb';
 
 const ACTIVE_SESSION_KEY = 'cropai_active_session_id';
 
@@ -98,11 +105,210 @@ export default function EditPage() {
   const sessionIdRef = useRef<string | null>(null);
   const sessionCreatedAtRef = useRef<number>(0);
   const sessionThumbnailRef = useRef<string | null>(null);
+
+  // AI description state
+  const [aiDescription, setAiDescription] = useState<string | null>(null);
+  const [aiDescriptionLoading, setAiDescriptionLoading] = useState(false);
+  const [typewriterText, setTypewriterText] = useState('');
+  const typewriterIndexRef = useRef(0);
+  const descriptionRequestedRef = useRef(false);
+  const fillerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fillerIndexRef = useRef(0);
+  const [fillerText, setFillerText] = useState('');
+  const fillerTypewriterRef = useRef(0);
+  const fillerTargetRef = useRef('');
+  const fillerTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(false);
   const persistenceInitRef = useRef(false);
 
   const checkShareSupport = useCallback(() => {
     try { setCanShare(typeof navigator.share === 'function'); } catch { setCanShare(false); }
+  }, []);
+
+  // ---- Filler texts while waiting for AI ----
+
+  const FILLER_TEXTS = useRef([
+    'Examining the composition and framing of your portrait...',
+    'Studying the lighting, shadows, and tonal balance in the image...',
+    'Analyzing facial features, expression, and gaze direction...',
+    'Identifying clothing details, textures, and color palette...',
+    'Evaluating the background elements and depth of field...',
+    'Assessing the overall mood and atmosphere of the portrait...',
+    'Detecting pose, posture, and body language cues...',
+    'Reviewing skin tones, highlights, and color grading...',
+    'Interpreting the visual narrative and setting of the scene...',
+    'Preparing a concise description of your portrait...',
+  ]).current;
+
+  const TIMEOUT_FALLBACK = 'A portrait photograph showing a person against a neutral background. The subject is positioned centrally with natural lighting.';
+
+  // Start filler typewriter cycling
+  const startFillerAnimation = useCallback(() => {
+    // Pick a random starting index
+    const startIdx = Math.floor(Math.random() * FILLER_TEXTS.length);
+    fillerIndexRef.current = startIdx;
+    fillerTypewriterRef.current = 0;
+    fillerTargetRef.current = FILLER_TEXTS[startIdx];
+    setFillerText('');
+
+    // Character-by-character typing
+    if (fillerTickRef.current) clearInterval(fillerTickRef.current);
+    fillerTickRef.current = setInterval(() => {
+      fillerTypewriterRef.current += 1;
+      setFillerText(fillerTargetRef.current.slice(0, fillerTypewriterRef.current));
+    }, 25);
+
+    // Cycle to next filler every 5.5 seconds
+    if (fillerIntervalRef.current) clearInterval(fillerIntervalRef.current);
+    fillerIntervalRef.current = setInterval(() => {
+      fillerIndexRef.current = (fillerIndexRef.current + 1) % FILLER_TEXTS.length;
+      fillerTargetRef.current = FILLER_TEXTS[fillerIndexRef.current];
+      fillerTypewriterRef.current = 0;
+      setFillerText('');
+    }, 5500);
+  }, [FILLER_TEXTS]);
+
+  const stopFillerAnimation = useCallback(() => {
+    if (fillerIntervalRef.current) { clearInterval(fillerIntervalRef.current); fillerIntervalRef.current = null; }
+    if (fillerTickRef.current) { clearInterval(fillerTickRef.current); fillerTickRef.current = null; }
+  }, []);
+
+  // ---- AI Description generation ----
+
+  const generateDescription = useCallback(async (imageBlob: Blob): Promise<string | null> => {
+    if (descriptionRequestedRef.current) return null;
+    descriptionRequestedRef.current = true;
+    setAiDescriptionLoading(true);
+    setAiDescription(null);
+    setTypewriterText('');
+    typewriterIndexRef.current = 0;
+    startFillerAnimation();
+
+    try {
+      // Downscale to ~400px for fast API call
+      const canvas = document.createElement('canvas');
+      const img = new Image();
+      const url = URL.createObjectURL(imageBlob);
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Failed to load'));
+        img.src = url;
+      });
+
+      const maxDim = 400;
+      const ratio = Math.min(maxDim / img.naturalWidth, maxDim / img.naturalHeight, 1);
+      canvas.width = Math.round(img.naturalWidth * ratio);
+      canvas.height = Math.round(img.naturalHeight * ratio);
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+
+      const lowResBlob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error('Failed to create low-res blob'))),
+          'image/jpeg',
+          0.7,
+        );
+      });
+
+      const formData = new FormData();
+      formData.append('image', lowResBlob, 'preview.jpg');
+
+      // Fetch with 60 second timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60_000);
+
+      let response: Response;
+      try {
+        response = await fetch('/api/describe', { method: 'POST', body: formData, signal: controller.signal });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+
+      if (!response.ok) throw new Error('Description API failed');
+
+      const { description } = await response.json();
+      stopFillerAnimation();
+      setAiDescription(description);
+      return description;
+    } catch (err) {
+      stopFillerAnimation();
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        // Timeout — use fallback
+        setAiDescription(TIMEOUT_FALLBACK);
+        return TIMEOUT_FALLBACK;
+      }
+      if (process.env.NODE_ENV === 'development') console.error('Description generation failed:', err);
+      setAiDescription(TIMEOUT_FALLBACK);
+      return TIMEOUT_FALLBACK;
+    } finally {
+      setAiDescriptionLoading(false);
+    }
+  }, [startFillerAnimation, stopFillerAnimation]);
+
+  // Typewriter effect: once description arrives, type it character-by-character
+  useEffect(() => {
+    if (!aiDescription) return;
+    typewriterIndexRef.current = 0;
+    setTypewriterText('');
+
+    const interval = setInterval(() => {
+      typewriterIndexRef.current += 1;
+      const nextText = aiDescription.slice(0, typewriterIndexRef.current);
+      setTypewriterText(nextText);
+      if (typewriterIndexRef.current >= aiDescription.length) {
+        clearInterval(interval);
+      }
+    }, 20);
+
+    return () => clearInterval(interval);
+  }, [aiDescription]);
+
+  // Clean up filler timers on unmount
+  useEffect(() => {
+    return () => {
+      stopFillerAnimation();
+    };
+  }, [stopFillerAnimation]);
+
+  // ---- Embedding generation (runs in background after description) ----
+
+  const generateAndStoreEmbedding = useCallback(async (
+    entryId: string,
+    description: string,
+    metadata: { cropType?: string; aspectRatio?: string; dimensions?: { width: number; height: number }; timestamp?: number },
+  ) => {
+    try {
+      // Check if embedding already exists for this ID
+      const existing = await loadVectorEntry(entryId);
+      if (existing) return;
+
+      const textToEmbed = composeEmbeddingText(description, metadata);
+      const tags = extractTags(description);
+
+      const response = await fetch('/api/embed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: textToEmbed, inputType: 'passage' }),
+      });
+
+      if (!response.ok) throw new Error('Embed API failed');
+
+      const { embedding } = await response.json();
+
+      const vectorEntry: VectorEntry = {
+        id: entryId,
+        text: textToEmbed,
+        description,
+        tags,
+        embedding,
+        timestamp: metadata.timestamp ?? Date.now(),
+      };
+
+      await saveVectorEntry(vectorEntry);
+    } catch (err) {
+      if (process.env.NODE_ENV === 'development') console.error('Embedding generation failed:', err);
+    }
   }, []);
 
   // ---- Session persistence helpers ----
@@ -126,9 +332,10 @@ export default function EditPage() {
       currentCrop,
       aspectRatio,
       thumbnailDataUrl: sessionThumbnailRef.current ?? undefined,
+      aiDescription: aiDescription ?? undefined,
       createdAt: sessionCreatedAtRef.current || Date.now(),
     };
-  }, [scaleFactor, naturalDimensions, previewDimensions, multiSuggestion, selectedCropType, currentCrop, aspectRatio]);
+  }, [scaleFactor, naturalDimensions, previewDimensions, multiSuggestion, selectedCropType, currentCrop, aspectRatio, aiDescription]);
 
   const debouncedSaveSession = useCallback(() => {
     if (sessionSaveTimerRef.current) clearTimeout(sessionSaveTimerRef.current);
@@ -257,6 +464,42 @@ export default function EditPage() {
       setAspectRatio(session.aspectRatio);
       setError(null);
       setLastExportBlob(null);
+      // Restore AI description if available from the session
+      if (session.aiDescription) {
+        setAiDescription(session.aiDescription);
+        descriptionRequestedRef.current = true;
+      } else {
+        setAiDescription(null);
+        descriptionRequestedRef.current = false;
+        // Check if embedding already exists before re-generating
+        const existingVector = await loadVectorEntry(session.id);
+        if (existingVector) {
+          // We have the vector entry — just restore the description from it
+          setAiDescription(existingVector.description);
+          descriptionRequestedRef.current = true;
+          // Also update the session so it caches the description for next time
+          const sd = buildSessionDataRef.current();
+          if (sd) {
+            sd.aiDescription = existingVector.description;
+            saveSession(sd);
+          }
+        } else {
+          // Generate description for restored session that doesn't have one
+          generateDescription(session.imageBlob).then((desc) => {
+            if (desc && session.id) {
+              generateAndStoreEmbedding(session.id, desc, {
+                cropType: session.selectedCropType,
+                aspectRatio: session.aspectRatio,
+                dimensions: { width: session.previewWidth, height: session.previewHeight },
+                timestamp: session.createdAt,
+              }).then(() => {
+                const sd = buildSessionDataRef.current();
+                if (sd) saveSession(sd);
+              });
+            }
+          });
+        }
+      }
       setPageState('editing');
     } catch {
       clearSession(sessionId);
@@ -264,7 +507,7 @@ export default function EditPage() {
       toast.error('Failed to restore session.');
       setPageState('no-session');
     }
-  }, []);
+  }, [generateDescription, generateAndStoreEmbedding]);
 
   // ---- Mount: check for pending upload or existing session ----
 
@@ -410,6 +653,26 @@ export default function EditPage() {
         sessionIdRef.current = generateUUID();
         sessionCreatedAtRef.current = Date.now();
 
+        // Start AI description generation + embedding pipeline in background
+        descriptionRequestedRef.current = false;
+        setAiDescription(null);
+        setTypewriterText('');
+        const currentSessionId = sessionIdRef.current;
+        generateDescription(file).then((desc) => {
+          if (desc && currentSessionId) {
+            generateAndStoreEmbedding(currentSessionId, desc, {
+              cropType: defaultCrop.type,
+              aspectRatio: resolveAspectRatio(defaultCrop),
+              dimensions: { width: downscaled.previewWidth, height: downscaled.previewHeight },
+              timestamp: Date.now(),
+            }).then(() => {
+              // Force a session save now that description + embedding are ready
+              const sessionData = buildSessionDataRef.current();
+              if (sessionData) saveSession(sessionData);
+            });
+          }
+        });
+
         const sessionThumbnail = await generateThumbnailDataUrl(file, 480);
         sessionThumbnailRef.current = sessionThumbnail;
         const initialSessionData: SessionData = {
@@ -497,6 +760,28 @@ export default function EditPage() {
       setHistory(prev => [entry, ...prev].slice(0, 20));
       saveHistoryEntry(entry);
       toast.success('Image exported successfully!');
+
+      // Copy the session's vector entry for the export (avoids redundant API call)
+      if (aiDescription && sessionIdRef.current) {
+        const sessionVector = await loadVectorEntry(sessionIdRef.current);
+        if (sessionVector) {
+          // Reuse the existing embedding — same image, same description
+          const exportVector: VectorEntry = {
+            ...sessionVector,
+            id: entry.id,
+            timestamp: entry.timestamp,
+          };
+          await saveVectorEntry(exportVector);
+        } else {
+          // Fallback: generate if session vector somehow missing
+          generateAndStoreEmbedding(entry.id, aiDescription, {
+            cropType: selectedCropType,
+            aspectRatio,
+            dimensions: { width: fullResCrop.width, height: fullResCrop.height },
+            timestamp: entry.timestamp,
+          });
+        }
+      }
     } catch {
       toast.error('Failed to export image. Please try again.');
     } finally {
@@ -771,25 +1056,41 @@ export default function EditPage() {
             )}
           </AnimatePresence>
 
-          {/* Crop metadata */}
+          {/* AI Description */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="mx-auto max-w-4xl rounded-xl bg-white/90 p-4 text-sm text-gray-500 shadow-sm dark:bg-gray-900/90 dark:text-gray-400"
+            className="mx-auto max-w-4xl rounded-xl bg-white/90 p-4 shadow-sm dark:bg-gray-900/90"
           >
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-              <span>Crop: {currentCrop.width} &times; {currentCrop.height}px</span>
-              <span>Position: ({currentCrop.x}, {currentCrop.y})</span>
-              {scaleFactor > 1 && (
-                <span className="font-medium text-green-600 dark:text-green-400">
-                  Export: {Math.round(currentCrop.width * scaleFactor)} &times; {Math.round(currentCrop.height * scaleFactor)}px
-                </span>
-              )}
-              <span className="text-blue-500">
-                AI confidence: {Math.round((multiSuggestion.crops.find(c => c.type === selectedCropType)?.confidence ?? 0.85) * 100)}%
-              </span>
-            </div>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+              AI Analysis
+            </p>
+            {aiDescriptionLoading ? (
+              <div className="flex items-start gap-3">
+                <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-500 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                </svg>
+                <p className="text-sm leading-relaxed text-gray-400 dark:text-gray-500 font-mono italic">
+                  {fillerText}
+                  <span className="inline-block w-0.5 h-4 ml-0.5 align-text-bottom bg-blue-500 animate-pulse" />
+                </p>
+              </div>
+            ) : aiDescription ? (
+              <div className="flex items-start gap-3">
+                <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                </svg>
+                <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-300 font-mono">
+                  {typewriterText}
+                  {typewriterText.length < aiDescription.length && (
+                    <span className="inline-block w-0.5 h-4 ml-0.5 align-text-bottom bg-blue-500 animate-pulse" />
+                  )}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400 dark:text-gray-500 italic">AI description unavailable</p>
+            )}
           </motion.div>
 
           {/* Inline History */}

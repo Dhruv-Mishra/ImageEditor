@@ -80,6 +80,8 @@ export interface SessionData {
   aspectRatio: AspectRatioOption;
   /** Base64 data-URL thumbnail for display in archive. */
   thumbnailDataUrl?: string;
+  /** AI-generated description of the image (stored once generated). */
+  aiDescription?: string;
   /** Timestamp for sorting/display. */
   createdAt: number;
 }
