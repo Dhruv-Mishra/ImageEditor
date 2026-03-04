@@ -63,6 +63,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Suppress errors from Brave/crypto wallet extensions injecting window.ethereum */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{Object.defineProperty(window,'ethereum',{get:function(){return undefined},set:function(){},configurable:true})}catch(e){}`,
+          }}
+        />
+      </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {/* Premium Image Background */}

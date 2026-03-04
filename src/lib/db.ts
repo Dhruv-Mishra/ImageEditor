@@ -6,32 +6,47 @@ const SESSION_STORE = 'session_store';
 const DB_VERSION = 2;
 
 let cachedDB: IDBDatabase | null = null;
+let dbUnavailable = false;
 
 function getDB(): Promise<IDBDatabase> {
+    if (dbUnavailable) return Promise.reject(new Error('IndexedDB unavailable'));
     if (cachedDB) return Promise.resolve(cachedDB);
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onupgradeneeded = (event) => {
-            const db = request.result;
-            const oldVersion = event.oldVersion;
+        try {
+            const request = indexedDB.open(DB_NAME, DB_VERSION);
+            request.onupgradeneeded = (event) => {
+                const db = request.result;
+                const oldVersion = event.oldVersion;
 
-            // Fresh install — create both stores
-            if (oldVersion < 1) {
-                db.createObjectStore(HISTORY_STORE, { keyPath: 'id' });
-            }
-            // Upgrade from v1 → v2 — add session store
-            if (oldVersion < 2) {
-                if (!db.objectStoreNames.contains(SESSION_STORE)) {
-                    db.createObjectStore(SESSION_STORE, { keyPath: 'id' });
+                // Fresh install — create both stores
+                if (oldVersion < 1) {
+                    db.createObjectStore(HISTORY_STORE, { keyPath: 'id' });
                 }
-            }
-        };
-        request.onsuccess = () => {
-            cachedDB = request.result;
-            cachedDB.onclose = () => { cachedDB = null; };
-            resolve(request.result);
-        };
-        request.onerror = () => reject(request.error);
+                // Upgrade from v1 → v2 — add session store
+                if (oldVersion < 2) {
+                    if (!db.objectStoreNames.contains(SESSION_STORE)) {
+                        db.createObjectStore(SESSION_STORE, { keyPath: 'id' });
+                    }
+                }
+            };
+            request.onsuccess = () => {
+                cachedDB = request.result;
+                cachedDB.onclose = () => { cachedDB = null; };
+                resolve(request.result);
+            };
+            request.onerror = () => {
+                dbUnavailable = true;
+                reject(request.error);
+            };
+            request.onblocked = () => {
+                dbUnavailable = true;
+                reject(new Error('IndexedDB blocked (private browsing?)'));
+            };
+        } catch {
+            // indexedDB.open() itself can throw in some private browsing modes
+            dbUnavailable = true;
+            reject(new Error('IndexedDB not available'));
+        }
     });
 }
 
