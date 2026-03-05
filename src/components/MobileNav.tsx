@@ -23,8 +23,8 @@ export function MobileNav() {
     const inactiveClass = 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100';
 
     return (
-        <div className="sm:hidden fixed bottom-4 left-4 right-4 z-50 pb-safe">
-            <div className="flex items-center justify-around h-16 px-2 rounded-full border border-white/20 bg-white/90 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-md dark:border-gray-700/50 dark:bg-gray-900/90">
+        <div className="sm:hidden fixed bottom-2 left-3 right-3 z-50 pb-safe">
+            <div className="flex items-center justify-around h-14 px-2 rounded-full border border-white/20 bg-white/90 shadow-[0_8px_30px_rgb(0,0,0,0.12)] backdrop-blur-md dark:border-gray-700/50 dark:bg-gray-900/90">
                 <Link
                     href="/"
                     onClick={handleHomeClick}

@@ -296,6 +296,7 @@ export function extractTags(description: string): string[] {
 
 /**
  * Compose the text that will be embedded: description + structured metadata.
+ * Includes rich metadata for better search relevance.
  */
 export function composeEmbeddingText(
   description: string,
@@ -304,18 +305,51 @@ export function composeEmbeddingText(
     aspectRatio?: string;
     dimensions?: { width: number; height: number };
     timestamp?: number;
+    fileName?: string;
+    orientation?: string;
+    allCropTypes?: string[];
   },
 ): string {
   const parts = [description];
 
   if (metadata.cropType) {
-    parts.push(`Crop type: ${metadata.cropType}`);
+    // Use human-readable label for the crop type
+    const cropLabels: Record<string, string> = {
+      face: 'tight close-up crop',
+      portrait: 'medium framing crop',
+      fullbody: 'loose framing crop',
+      slightly_far: 'wide framing crop',
+    };
+    parts.push(`Crop style: ${cropLabels[metadata.cropType] ?? metadata.cropType}`);
+  }
+  if (metadata.allCropTypes && metadata.allCropTypes.length > 0) {
+    parts.push(`Available crops: ${metadata.allCropTypes.join(', ')}`);
   }
   if (metadata.aspectRatio) {
-    parts.push(`Aspect ratio: ${metadata.aspectRatio}`);
+    const ratioLabels: Record<string, string> = {
+      '1:1': 'square format',
+      '3:4': 'portrait format three by four',
+      '4:5': 'portrait format four by five',
+      'free': 'freeform aspect ratio',
+    };
+    parts.push(`Format: ${ratioLabels[metadata.aspectRatio] ?? metadata.aspectRatio}`);
   }
   if (metadata.dimensions) {
-    parts.push(`Resolution: ${metadata.dimensions.width}x${metadata.dimensions.height}`);
+    const { width, height } = metadata.dimensions;
+    parts.push(`Resolution: ${width}x${height}`);
+    const orient = width > height ? 'landscape orientation' : width < height ? 'portrait orientation' : 'square orientation';
+    parts.push(orient);
+  }
+  if (metadata.orientation) {
+    parts.push(`Orientation: ${metadata.orientation}`);
+  }
+  if (metadata.fileName) {
+    // Extract meaningful words from filename (remove extension and common separators)
+    const nameWords = metadata.fileName
+      .replace(/\.[^.]+$/, '')
+      .replace(/[_\-\.]/g, ' ')
+      .trim();
+    if (nameWords.length > 2) parts.push(`File: ${nameWords}`);
   }
   if (metadata.timestamp) {
     const date = new Date(metadata.timestamp);

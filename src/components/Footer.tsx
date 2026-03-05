@@ -25,7 +25,29 @@ const techStack = [
 export function Footer() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 mb-20 sm:mb-8 pointer-events-none">
-      <footer className="pointer-events-auto rounded-3xl border border-white/20 bg-white/90 shadow-[0_8px_30px_rgb(0,0,0,0.08)] dark:border-gray-700/50 dark:bg-gray-900/90 px-6 py-10 sm:px-10">
+      <footer className="pointer-events-auto rounded-2xl sm:rounded-3xl border border-white/20 bg-white/90 shadow-[0_8px_30px_rgb(0,0,0,0.08)] dark:border-gray-700/50 dark:bg-gray-900/90 px-4 py-6 sm:px-10 sm:py-10">
+        {/* Mobile: simplified single-column footer */}
+        <div className="sm:hidden flex flex-col items-center gap-4 text-center">
+          <div className="flex items-center gap-2">
+            <img src="/favicon-32x32.png" alt="Cropio" width={24} height={24} className="h-6 w-6 rounded-md" />
+            <span className="font-bold text-sm text-gray-900 dark:text-white">Cropio</span>
+          </div>
+          <p className="text-xs leading-relaxed text-gray-500 dark:text-gray-400 max-w-[260px]">
+            AI-powered portrait cropping — upload, crop, and export headshots in your browser.
+          </p>
+          <div className="flex gap-4 text-xs text-gray-400 dark:text-gray-500">
+            <Link href="/" className="hover:text-gray-700 dark:hover:text-gray-300">Home</Link>
+            <Link href="/archive" className="hover:text-gray-700 dark:hover:text-gray-300">Archive</Link>
+            <Link href="/about" className="hover:text-gray-700 dark:hover:text-gray-300">About</Link>
+            <a href="https://github.com/Dhruv-Mishra/ImageEditor" target="_blank" rel="noopener noreferrer" className="hover:text-gray-700 dark:hover:text-gray-300">GitHub</a>
+          </div>
+          <p className="text-[10px] text-gray-400 dark:text-gray-500">
+            &copy; {new Date().getFullYear()} Cropio
+          </p>
+        </div>
+
+        {/* Desktop: full footer */}
+        <div className="hidden sm:block">
         <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand column */}
           <div className="sm:col-span-2 lg:col-span-1">
@@ -125,6 +147,7 @@ export function Footer() {
           <p className="text-xs text-gray-400 dark:text-gray-500">
             Images are processed locally. Nothing is stored on our servers.
           </p>
+        </div>
         </div>
       </footer>
     </div>

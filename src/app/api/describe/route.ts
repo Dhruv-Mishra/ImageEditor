@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
           content: [
             {
               type: 'text',
-              text: 'Describe this image concisely in 2-3 plain text sentences. Do not use markdown, bullet points, or emojis.',
+              text: 'Describe this portrait photo in 3-4 concise plain text sentences optimized for search. Include: the person\'s facial expression and mood, hair style and color, clothing type and colors, visible accessories (glasses, jewelry, hat, etc.), background setting and colors, lighting quality, and body pose or framing. Do not use markdown, bullet points, or emojis.',
             },
             {
               type: 'image_url',

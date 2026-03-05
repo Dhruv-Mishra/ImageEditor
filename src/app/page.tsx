@@ -31,6 +31,28 @@ function TypewriterText() {
   return <>{text}<span className="animate-pulse">|</span></>;
 }
 
+/**
+ * Height-stable typewriter container.
+ * Uses CSS Grid with all strings in the same cell so the container height
+ * equals the tallest rendered string. Prevents layout shifts during typing.
+ */
+function StableTypewriter() {
+  return (
+    <span className="relative grid bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent dark:from-blue-400 dark:to-indigo-400 mt-2 w-full max-w-[90vw] break-words leading-relaxed pb-3 text-center [&>*]:col-start-1 [&>*]:row-start-1">
+      {/* Invisible height reserves — each occupies the same grid cell */}
+      {TYPEWRITER_STRINGS.map((s) => (
+        <span key={s} className="invisible select-none" aria-hidden="true">
+          {s}
+        </span>
+      ))}
+      {/* Visible typewriter — same grid cell, on top */}
+      <span>
+        <TypewriterText />
+      </span>
+    </span>
+  );
+}
+
 export default function Home() {
   const router = useRouter();
   const { vibrate } = useAppHaptics();
@@ -46,29 +68,35 @@ export default function Home() {
 
   return (
     <>
-      <section className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-        <div className="flex min-h-[50vh] w-full flex-col items-center justify-center py-6 sm:py-10">
+      <section className="mx-auto max-w-4xl px-4 py-4 sm:px-6 sm:py-12 lg:px-8">
+        <div className="flex min-h-[40vh] sm:min-h-[50vh] w-full flex-col items-center justify-center py-4 sm:py-10">
           {/* Hero heading */}
-          <div className="mb-10 text-center">
+          <div className="mb-6 sm:mb-10 text-center">
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, ease: 'easeOut' }}
-              className="text-5xl font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-6xl sm:leading-tight flex flex-col items-center justify-center pt-8 overflow-hidden"
+              className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white sm:text-6xl sm:leading-tight flex flex-col items-center justify-center pt-4 sm:pt-8 overflow-hidden"
             >
               <span className="pb-1">Perfect headshots,</span>
-              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent dark:from-blue-400 dark:to-indigo-400 mt-2 block min-h-[1.4em] w-full max-w-[90vw] break-words leading-relaxed pb-3 text-center">
-                <TypewriterText />
-              </span>
+              <StableTypewriter />
             </motion.h1>
             <motion.p
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.1, ease: 'easeOut' }}
-              className="mx-auto mt-6 max-w-xl text-lg text-gray-600 dark:text-gray-400 sm:text-xl"
+              className="mx-auto mt-3 sm:mt-6 max-w-xl text-sm text-gray-600 dark:text-gray-400 sm:text-xl hidden sm:block"
             >
               Upload a portrait photo, get an intelligent crop suggestion,
               fine-tune it to your liking, and export at full resolution.
+            </motion.p>
+            <motion.p
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.1, ease: 'easeOut' }}
+              className="mx-auto mt-3 max-w-xs text-sm text-gray-600 dark:text-gray-400 sm:hidden"
+            >
+              Upload a portrait, get an AI crop suggestion, and export.
             </motion.p>
           </div>
 

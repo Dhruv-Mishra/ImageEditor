@@ -97,6 +97,7 @@ export default function EditPage() {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [lastExportBlob, setLastExportBlob] = useState<Blob | null>(null);
   const [canShare, setCanShare] = useState(false);
+  const [aiDescExpanded, setAiDescExpanded] = useState(false);
 
   const fullResBlobRef = useRef<Blob | null>(null);
   const previewBlobRef = useRef<Blob | null>(null);
@@ -186,7 +187,7 @@ export default function EditPage() {
     startFillerAnimation();
 
     try {
-      // Downscale to ~400px for fast API call
+      // Downscale to ~512px for fast API call
       const canvas = document.createElement('canvas');
       const img = new Image();
       const url = URL.createObjectURL(imageBlob);
@@ -196,7 +197,7 @@ export default function EditPage() {
         img.src = url;
       });
 
-      const maxDim = 400;
+      const maxDim = 512;
       const ratio = Math.min(maxDim / img.naturalWidth, maxDim / img.naturalHeight, 1);
       canvas.width = Math.round(img.naturalWidth * ratio);
       canvas.height = Math.round(img.naturalHeight * ratio);
@@ -284,7 +285,7 @@ export default function EditPage() {
   const generateAndStoreEmbedding = useCallback(async (
     entryId: string,
     description: string,
-    metadata: { cropType?: string; aspectRatio?: string; dimensions?: { width: number; height: number }; timestamp?: number },
+    metadata: { cropType?: string; aspectRatio?: string; dimensions?: { width: number; height: number }; timestamp?: number; fileName?: string; allCropTypes?: string[] },
   ) => {
     try {
       // Check if embedding already exists for this ID
@@ -502,6 +503,7 @@ export default function EditPage() {
                 aspectRatio: session.aspectRatio,
                 dimensions: { width: session.previewWidth, height: session.previewHeight },
                 timestamp: session.createdAt,
+                allCropTypes: session.multiSuggestion?.crops.map(c => c.type),
               }).then(() => {
                 const sd = buildSessionDataRef.current();
                 if (sd) saveSession(sd);
@@ -676,6 +678,8 @@ export default function EditPage() {
               aspectRatio: resolveAspectRatio(defaultCrop),
               dimensions: { width: downscaled.previewWidth, height: downscaled.previewHeight },
               timestamp: Date.now(),
+              fileName: file.name,
+              allCropTypes: multiResponse.crops.map(c => c.type),
             }).then(() => {
               // Force a session save now that description + embedding are ready
               const sessionData = buildSessionDataRef.current();
@@ -869,7 +873,7 @@ export default function EditPage() {
   // Loading state — show nothing while checking for session
   if (pageState === 'loading') {
     return (
-      <section className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+      <section className="mx-auto max-w-4xl px-3 py-4 sm:px-6 sm:py-12 lg:px-8">
         <div className="flex min-h-[50vh] items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600 dark:border-gray-600 dark:border-t-blue-400" />
@@ -883,14 +887,14 @@ export default function EditPage() {
   // No session — show upload zone
   if (pageState === 'no-session') {
     return (
-      <section className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+      <section className="mx-auto max-w-4xl px-3 py-4 sm:px-6 sm:py-12 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
           className="flex flex-col items-center"
         >
-          <div className="mb-10 text-center">
+          <div className="mb-6 sm:mb-10 text-center">
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -939,8 +943,8 @@ export default function EditPage() {
   // Uploading state
   if (pageState === 'uploading') {
     return (
-      <section className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-        <div className="flex min-h-[50vh] w-full flex-col items-center justify-center space-y-6 py-6 sm:py-10">
+      <section className="mx-auto max-w-4xl px-3 py-4 sm:px-6 sm:py-12 lg:px-8">
+        <div className="flex min-h-[50vh] w-full flex-col items-center justify-center space-y-6 py-4 sm:py-10">
           <div className="flex w-full min-h-[280px] max-w-2xl items-center justify-center overflow-hidden rounded-3xl bg-gray-100/50 shadow-sm backdrop-blur-sm dark:bg-gray-900/50 border-2 border-dashed border-gray-200 dark:border-gray-800">
             <div className="flex w-full items-center justify-center py-12">
               <div className="flex flex-col items-center gap-4">
@@ -963,7 +967,7 @@ export default function EditPage() {
 
   // Editing / Exporting state
   return (
-    <section className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+    <section className="mx-auto max-w-4xl px-3 py-3 sm:px-6 sm:py-12 lg:px-8">
       {/* Error banner */}
       <AnimatePresence>
         {error && (
@@ -984,7 +988,7 @@ export default function EditPage() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="space-y-6"
+          className="space-y-4 sm:space-y-6"
         >
           <CropEditor
             key={resetKey}
@@ -1007,17 +1011,17 @@ export default function EditPage() {
           />
 
           {/* Controls bar */}
-          <div className="sticky bottom-6 z-40 mx-auto mt-6 flex w-full flex-col gap-4 rounded-3xl border border-white/20 bg-white/70 p-4 shadow-2xl backdrop-blur-xl dark:border-gray-700/50 dark:bg-gray-900/70 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="sticky bottom-20 sm:bottom-6 z-40 mx-auto mt-3 sm:mt-6 flex w-full flex-col gap-2.5 sm:gap-4 rounded-2xl sm:rounded-3xl border border-white/20 bg-white/80 p-3 sm:p-5 shadow-2xl backdrop-blur-xl dark:border-gray-700/50 dark:bg-gray-900/80 sm:flex-row sm:items-center sm:justify-between">
             <AspectRatioSelector value={aspectRatio} onChange={setAspectRatio} />
 
             <div className="flex items-center justify-center gap-2 w-full sm:w-auto">
-              <button onClick={handleResetToAi} className="rounded-full border border-blue-300/50 bg-blue-50/50 px-5 py-2.5 text-sm font-medium text-blue-600 shadow-sm backdrop-blur-sm transition-all duration-150 hover:scale-105 hover:bg-blue-100/50 hover:shadow-md active:scale-95 dark:border-blue-700/50 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-800/50">
+              <button onClick={handleResetToAi} className="rounded-full border border-blue-300/50 bg-blue-50/50 px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-blue-600 shadow-sm backdrop-blur-sm transition-all duration-150 hover:scale-105 hover:bg-blue-100/50 hover:shadow-md active:scale-95 dark:border-blue-700/50 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-800/50">
                 Reset
               </button>
               <button
                 onClick={handleExport}
                 disabled={pageState === 'exporting'}
-                className="rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-2.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 transition-all duration-150 hover:scale-105 hover:shadow-[0px_10px_20px_rgba(79,70,229,0.4)] hover:from-blue-500 hover:to-indigo-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:from-blue-500 dark:to-indigo-500"
+                className="rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-6 sm:px-8 py-2 sm:py-2.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-500/30 transition-all duration-150 hover:scale-105 hover:shadow-[0px_10px_20px_rgba(79,70,229,0.4)] hover:from-blue-500 hover:to-indigo-500 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 dark:from-blue-500 dark:to-indigo-500"
               >
                 {pageState === 'exporting'
                   ? (<><svg className="inline h-4 w-4 animate-spin mr-1.5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Exporting…</>)
@@ -1067,16 +1071,34 @@ export default function EditPage() {
             )}
           </AnimatePresence>
 
-          {/* AI Description */}
+          {/* AI Description — collapsible on mobile */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.5 }}
-            className="mx-auto max-w-4xl rounded-xl bg-white/90 p-4 shadow-sm dark:bg-gray-900/90"
+            className="mx-auto max-w-4xl rounded-xl bg-white/90 p-3 sm:p-4 shadow-sm dark:bg-gray-900/90"
           >
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-              AI Analysis
-            </p>
+            <button
+              type="button"
+              onClick={() => setAiDescExpanded((v) => !v)}
+              className="flex w-full items-center justify-between sm:pointer-events-none"
+              aria-expanded={aiDescExpanded}
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                AI Analysis
+              </p>
+              <svg
+                className={`h-4 w-4 text-gray-400 transition-transform sm:hidden ${aiDescExpanded ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                aria-hidden="true"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <div className={`overflow-hidden transition-all duration-200 ${aiDescExpanded ? 'max-h-96 mt-2' : 'max-h-0 sm:max-h-96 sm:mt-2'}`}>
             {aiDescriptionLoading ? (
               <div className="flex items-start gap-3">
                 <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-500 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1102,11 +1124,12 @@ export default function EditPage() {
             ) : (
               <p className="text-sm text-gray-400 dark:text-gray-500 italic">AI description unavailable</p>
             )}
+            </div>
           </motion.div>
 
-          {/* Inline History */}
+          {/* Inline History — hidden on mobile to reduce clutter, available via Archive tab */}
           {history.length > 0 && (
-            <div className="mt-8">
+            <div className="mt-8 hidden sm:block">
               <CropHistory entries={history} onSelect={handleLoadFromHistory} onClear={handleClearHistory} onDelete={handleDeleteEntry} />
             </div>
           )}

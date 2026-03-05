@@ -63,10 +63,10 @@ KPT_CONF = 0.3  # minimum keypoint confidence
 
 # Crop-type metadata
 CROP_META = {
-    "face":         {"label": "Face Closeup",     "aspectRatio": "1:1", "ratio": 1.0},
-    "portrait":     {"label": "Shoulder Portrait", "aspectRatio": "3:4", "ratio": 3 / 4},
-    "fullbody":     {"label": "Full Body",         "aspectRatio": "3:4", "ratio": 3 / 4},
-    "slightly_far": {"label": "Full Body (Wide)",  "aspectRatio": "4:5", "ratio": 4 / 5},
+    "face":         {"label": "Tight",    "aspectRatio": "1:1", "ratio": 1.0},
+    "portrait":     {"label": "Medium",   "aspectRatio": "3:4", "ratio": 3 / 4},
+    "fullbody":     {"label": "Loose",    "aspectRatio": "3:4", "ratio": 3 / 4},
+    "slightly_far": {"label": "Wide",     "aspectRatio": "4:5", "ratio": 4 / 5},
 }
 
 

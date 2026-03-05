@@ -24,10 +24,34 @@ export function CropTypeSelector({
 }: CropTypeSelectorProps) {
   const { vibrate } = useAppHaptics();
 
+  // Deduplicate crops with same dimensions, keeping the first occurrence.
+  // Always show at least 2 crops.
+  const uniqueCrops = useMemo(() => {
+    const seen = new Set<string>();
+    const deduped: CropVariant[] = [];
+    for (const crop of crops) {
+      const key = `${crop.cropRegion.width}x${crop.cropRegion.height}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(crop);
+      }
+    }
+    // Guarantee at least 2 presets: if dedup collapsed too many, re-add from originals
+    if (deduped.length < 2) {
+      for (const crop of crops) {
+        if (!deduped.some((d) => d.type === crop.type)) {
+          deduped.push(crop);
+          if (deduped.length >= 2) break;
+        }
+      }
+    }
+    return deduped;
+  }, [crops]);
+
   // Pre-compute clip-path inset values for each crop variant (GPU-accelerated)
   const clipPaths = useMemo(() => {
     const map = new Map<CropType, string>();
-    for (const crop of crops) {
+    for (const crop of uniqueCrops) {
       const { x, y, width, height } = crop.cropRegion;
       const top = (y / imageHeight) * 100;
       const right = ((imageWidth - x - width) / imageWidth) * 100;
@@ -36,7 +60,7 @@ export function CropTypeSelector({
       map.set(crop.type, `inset(${top}% ${right}% ${bottom}% ${left}%)`);
     }
     return map;
-  }, [crops, imageWidth, imageHeight]);
+  }, [uniqueCrops, imageWidth, imageHeight]);
 
   return (
     <motion.div
@@ -46,17 +70,17 @@ export function CropTypeSelector({
       transition={{ duration: 0.35, ease: 'easeOut', delay: 0.1 }}
     >
       {/* Label */}
-      <p className="mb-3 text-center text-[11px] font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+      <p className="mb-2 sm:mb-3 text-center text-[10px] sm:text-[11px] font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">
         Crop Preset
       </p>
 
       {/* Scrollable row */}
       <div
-        className="flex gap-2 overflow-x-auto px-3 pt-2.5 pb-2 -mx-2 scrollbar-hide sm:justify-center sm:gap-3"
+        className="flex gap-1.5 sm:gap-2 overflow-x-auto px-2 sm:px-3 pt-2 pb-1.5 sm:pt-2.5 sm:pb-2 -mx-2 scrollbar-hide sm:justify-center sm:gap-3"
         role="radiogroup"
         aria-label="Crop preset"
       >
-        {crops.map((crop) => {
+        {uniqueCrops.map((crop) => {
           const isSelected = selectedType === crop.type;
 
           return (
@@ -70,8 +94,8 @@ export function CropTypeSelector({
               aria-checked={isSelected}
               aria-label={crop.label}
               className={`
-                group relative flex flex-shrink-0 flex-col items-center gap-1.5 rounded-xl p-1.5 transition-all duration-200
-                w-[76px] sm:w-[84px]
+                group relative flex flex-shrink-0 flex-col items-center gap-1 sm:gap-1.5 rounded-xl p-1 sm:p-1.5 transition-all duration-200
+                w-[64px] sm:w-[84px]
                 ${isSelected ? 'z-10' : 'hover:bg-white/30 dark:hover:bg-gray-800/40'}
               `}
             >

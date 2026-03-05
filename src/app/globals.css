@@ -44,6 +44,15 @@ body {
   border-color: rgba(255, 255, 255, 0.7);
 }
 
+/* Mobile: allow page scroll over the crop image, but prevent scroll on crop handles/selection */
+.ReactCrop {
+  touch-action: pan-y pan-x;
+}
+.ReactCrop__crop-selection,
+.ReactCrop__drag-handle {
+  touch-action: none;
+}
+
 /* Hide scrollbar but allow scrolling */
 .scrollbar-hide {
   -ms-overflow-style: none;
@@ -89,15 +98,47 @@ html {
   animation-play-state: paused;
 }
 
-/* React Crop Custom Aesthetics */
+/* ================================================================
+   React Crop — Production-grade aesthetics
+   Corner L-bracket handles, bold border, optimised for touch
+   ================================================================ */
+
+/* Container perf hint */
+.crop-editor-container {
+  will-change: contents;
+  contain: style;
+  overflow: hidden;
+}
+
+/* Frame wrapper — padding creates the dark mat around the image.
+   overflow: hidden clips the 9999px box-shadow so it doesn't darken
+   the rest of the page. The padding is large enough that crop handles
+   at edges remain fully visible within the frame. */
+.crop-editor-frame {
+  overflow: hidden;
+  position: relative;
+}
+
+/* Let ReactCrop handles overflow the image bounds into the frame padding */
+.crop-editor-frame .ReactCrop {
+  overflow: visible !important;
+}
+
+.crop-editor-react-crop {
+  /* Prevent iOS rubber-band bounce inside crop area */
+  -webkit-overflow-scrolling: auto;
+}
+
+/* Crop selection box */
 .ReactCrop__crop-selection {
-  border-radius: 4px !important;
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45) !important;
-  border: 2.5px solid rgba(255, 255, 255, 0.9) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5) !important;
+  border: 2px solid rgba(255, 255, 255, 0.95) !important;
   animation: none !important;
   background-image: none !important;
   background: none !important;
   outline: none !important;
+  will-change: transform;
 }
 
 .ReactCrop__crop-selection:focus {
@@ -110,67 +151,174 @@ html {
   display: none !important;
 }
 
-/* Remove dotted lines on crop edges (drag-handle borders) */
+/* Dark mode */
+.dark .ReactCrop__crop-selection {
+  border-color: rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* ---- Drag handles: hide default circles, show L-bracket corners ---- */
 .ReactCrop__drag-handle {
   border: none !important;
   outline: none !important;
+  /* Expand touch target on mobile — critical for usability */
+  width: 36px !important;
+  height: 36px !important;
 }
 
-/* Dark mode: slightly brighter border */
-.dark .ReactCrop__crop-selection {
-  border-color: rgba(255, 255, 255, 0.7) !important;
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55) !important;
-}
-
+/* Remove default pseudo-element circles */
 .ReactCrop__drag-handle::after {
-  background-color: rgba(255, 255, 255, 0.95) !important;
-  border: none !important;
-  border-radius: 50% !important;
-  width: 10px !important;
-  height: 10px !important;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2) !important;
-  transition: transform 0.15s ease, opacity 0.15s ease;
-  opacity: 0.8;
+  display: none !important;
 }
 
-.ReactCrop__drag-handle:hover::after {
-  transform: scale(1.3);
-  opacity: 1;
+/* L-bracket corner handles via ::before pseudo elements */
+.ReactCrop__drag-handle::before {
+  content: '' !important;
+  display: block !important;
+  position: absolute !important;
+  width: 20px !important;
+  height: 20px !important;
+  border-color: #fff !important;
+  border-style: solid !important;
+  border-width: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  box-shadow: none !important;
+  transition: border-color 0.1s ease;
+  pointer-events: none;
 }
 
-/* Specific offsets for the circular handles so they stay centered */
-.ReactCrop__drag-handle.ord-nw::after {
-  margin-top: -5px !important;
-  margin-left: -5px !important;
+/* Corner brackets — each gets two thick edges */
+.ReactCrop__drag-handle.ord-nw::before {
+  border-top-width: 3px !important;
+  border-left-width: 3px !important;
+  border-top-left-radius: 5px !important;
+  top: 0 !important;
+  left: 0 !important;
 }
 
-.ReactCrop__drag-handle.ord-n::after {
-  margin-top: -5px !important;
+.ReactCrop__drag-handle.ord-ne::before {
+  border-top-width: 3px !important;
+  border-right-width: 3px !important;
+  border-top-right-radius: 5px !important;
+  top: 0 !important;
+  right: 0 !important;
 }
 
-.ReactCrop__drag-handle.ord-ne::after {
-  margin-top: -5px !important;
-  margin-right: -5px !important;
+.ReactCrop__drag-handle.ord-se::before {
+  border-bottom-width: 3px !important;
+  border-right-width: 3px !important;
+  border-bottom-right-radius: 5px !important;
+  bottom: 0 !important;
+  right: 0 !important;
 }
 
-.ReactCrop__drag-handle.ord-e::after {
-  margin-right: -5px !important;
+.ReactCrop__drag-handle.ord-sw::before {
+  border-bottom-width: 3px !important;
+  border-left-width: 3px !important;
+  border-bottom-left-radius: 5px !important;
+  bottom: 0 !important;
+  left: 0 !important;
 }
 
-.ReactCrop__drag-handle.ord-se::after {
-  margin-bottom: -5px !important;
-  margin-right: -5px !important;
+/* Edge handles — small centered bars for fine-tune */
+.ReactCrop__drag-handle.ord-n::before {
+  border-top-width: 3px !important;
+  width: 28px !important;
+  height: 0 !important;
+  top: 0 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  border-radius: 2px !important;
 }
 
-.ReactCrop__drag-handle.ord-s::after {
-  margin-bottom: -5px !important;
+.ReactCrop__drag-handle.ord-s::before {
+  border-bottom-width: 3px !important;
+  width: 28px !important;
+  height: 0 !important;
+  bottom: 0 !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  border-radius: 2px !important;
 }
 
-.ReactCrop__drag-handle.ord-sw::after {
-  margin-bottom: -5px !important;
-  margin-left: -5px !important;
+.ReactCrop__drag-handle.ord-e::before {
+  border-right-width: 3px !important;
+  width: 0 !important;
+  height: 28px !important;
+  right: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  border-radius: 2px !important;
 }
 
-.ReactCrop__drag-handle.ord-w::after {
-  margin-left: -5px !important;
+.ReactCrop__drag-handle.ord-w::before {
+  border-left-width: 3px !important;
+  width: 0 !important;
+  height: 28px !important;
+  left: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  border-radius: 2px !important;
+}
+
+/* Dark mode handles */
+.dark .ReactCrop__drag-handle::before {
+  border-color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Mobile: bigger touch targets for handles */
+@media (pointer: coarse) {
+  .ReactCrop__drag-handle {
+    width: 44px !important;
+    height: 44px !important;
+  }
+
+  .ReactCrop__drag-handle.ord-nw::before,
+  .ReactCrop__drag-handle.ord-ne::before,
+  .ReactCrop__drag-handle.ord-se::before,
+  .ReactCrop__drag-handle.ord-sw::before {
+    width: 24px !important;
+    height: 24px !important;
+    border-width: 0 !important;
+  }
+
+  .ReactCrop__drag-handle.ord-nw::before {
+    border-top-width: 3.5px !important;
+    border-left-width: 3.5px !important;
+  }
+
+  .ReactCrop__drag-handle.ord-ne::before {
+    border-top-width: 3.5px !important;
+    border-right-width: 3.5px !important;
+  }
+
+  .ReactCrop__drag-handle.ord-se::before {
+    border-bottom-width: 3.5px !important;
+    border-right-width: 3.5px !important;
+  }
+
+  .ReactCrop__drag-handle.ord-sw::before {
+    border-bottom-width: 3.5px !important;
+    border-left-width: 3.5px !important;
+  }
+
+  .ReactCrop__drag-handle.ord-n::before,
+  .ReactCrop__drag-handle.ord-s::before {
+    width: 36px !important;
+  }
+
+  .ReactCrop__drag-handle.ord-e::before,
+  .ReactCrop__drag-handle.ord-w::before {
+    height: 36px !important;
+  }
+}
+
+/* Rule-of-thirds grid inside crop box */
+.ReactCrop__crop-selection {
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.18) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.18) 1px, transparent 1px) !important;
+  background-size: 33.333% 33.333% !important;
+  background-position: center !important;
 }

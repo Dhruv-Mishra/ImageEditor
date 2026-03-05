@@ -42,7 +42,7 @@ export function AspectRatioSelector({
               aria-checked={isSelected}
               title={opt.label}
               className={`
-                group relative flex flex-col items-center justify-center gap-1.5 rounded-xl px-3 py-2 transition-all duration-200 flex-1 sm:flex-none min-w-[64px]
+                group relative flex flex-col items-center justify-center gap-1 sm:gap-1.5 rounded-xl px-2 sm:px-3 py-1.5 sm:py-2 transition-all duration-200 flex-1 sm:flex-none min-w-[52px] sm:min-w-[64px]
                 ${isSelected
                   ? 'shadow-sm z-10'
                   : 'hover:bg-gray-100/50 dark:hover:bg-gray-800/50'

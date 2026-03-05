@@ -8,7 +8,7 @@ import type { CropRegion, DownscaledImage } from './types';
  */
 export async function downscaleImage(
   file: File,
-  maxDimension: number = 1200,
+  maxDimension: number = 1800,
 ): Promise<DownscaledImage> {
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);

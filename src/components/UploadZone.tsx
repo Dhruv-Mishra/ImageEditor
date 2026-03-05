@@ -73,8 +73,8 @@ export function UploadZone({ onImageSelected }: UploadZoneProps) {
         tabIndex={0}
         aria-label="Upload a portrait photo. Click or drag and drop an image."
         className={`
-          group relative flex min-h-[280px] w-full max-w-2xl cursor-pointer flex-col items-center justify-center
-          overflow-hidden rounded-3xl border-2 border-dashed p-8
+          group relative flex min-h-[180px] sm:min-h-[280px] w-full max-w-2xl cursor-pointer flex-col items-center justify-center
+          overflow-hidden rounded-2xl sm:rounded-3xl border-2 border-dashed p-5 sm:p-8
           transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-indigo-500/10 dark:hover:shadow-indigo-500/10
           ${isDragging
             ? 'border-indigo-500 bg-indigo-50/80 backdrop-blur-md scale-[1.02] dark:border-indigo-400 dark:bg-indigo-950/40'
@@ -99,7 +99,7 @@ export function UploadZone({ onImageSelected }: UploadZoneProps) {
           transition={{ type: 'spring', stiffness: 300, damping: 20 }}
         >
           <svg
-            className={`mb-4 h-16 w-16 transition-all duration-300 ${isDragging ? 'text-indigo-500 scale-110' : 'text-gray-400 group-hover:text-indigo-400 group-hover:-translate-y-1'}`}
+            className={`mb-3 sm:mb-4 h-10 w-10 sm:h-16 sm:w-16 transition-all duration-300 ${isDragging ? 'text-indigo-500 scale-110' : 'text-gray-400 group-hover:text-indigo-400 group-hover:-translate-y-1'}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -114,10 +114,10 @@ export function UploadZone({ onImageSelected }: UploadZoneProps) {
           </svg>
         </motion.div>
 
-        <p className="relative mb-1 text-lg font-semibold text-gray-700 dark:text-gray-200">
+        <p className="relative mb-1 text-base sm:text-lg font-semibold text-gray-700 dark:text-gray-200">
           {isDragging ? 'Drop your photo here' : 'Drag & drop your portrait photo'}
         </p>
-        <p className="relative text-sm text-gray-500 dark:text-gray-400">
+        <p className="relative text-xs sm:text-sm text-gray-500 dark:text-gray-400">
           or click to browse — JPEG, PNG, WebP up to 10 MB
         </p>
       </motion.div>

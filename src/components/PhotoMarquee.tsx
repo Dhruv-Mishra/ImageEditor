@@ -31,7 +31,7 @@ export function PhotoMarquee() {
     return (
         <div
             ref={containerRef}
-            className="w-full relative overflow-hidden bg-white/70 dark:bg-black/60 py-8 sm:py-12 my-8 shadow-sm dark:shadow-xl border-y border-gray-200/50 dark:border-white/5 opacity-90 transition-all duration-500 mx-auto max-w-6xl rounded-2xl sm:rounded-3xl border-x"
+            className="w-full relative overflow-hidden bg-white/70 dark:bg-black/60 py-5 sm:py-12 my-4 sm:my-8 shadow-sm dark:shadow-xl border-y border-gray-200/50 dark:border-white/5 opacity-90 transition-all duration-500 mx-auto max-w-6xl rounded-xl sm:rounded-3xl border-x"
         >
             {/* Film Sprockets */}
             <div className="absolute top-2 left-0 right-0 h-3 sm:h-4 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSIyMCI+PHJlY3QgeD0iMTYiIHk9IjQiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxMiIgZmlsbD0iIzAwMDAwMCIgb3BhY2l0eT0iMC4xIiByeD0iMiIvPjwvc3ZnPg==')] dark:bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0OCIgaGVpZ2h0PSIyMCI+PHJlY3QgeD0iMTYiIHk9IjQiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxMiIgZmlsbD0iI2ZmZmZmZiIgb3BhY2l0eT0iMC4yNSIgcng9IjIiLz48L3N2Zz4=')] bg-repeat-x transition-all" />
@@ -50,11 +50,11 @@ export function PhotoMarquee() {
                     style={{ willChange: isVisible ? 'transform' : 'auto' }}
                 >
                     {Array.from({ length: 3 }).map((_, blockIdx) => (
-                        <div key={blockIdx} className="flex gap-6 pr-6 sm:gap-16 sm:pr-16 items-center">
+                        <div key={blockIdx} className="flex gap-4 pr-4 sm:gap-16 sm:pr-16 items-center">
                             {portraits.map((src, idx) => (
                                 <div
                                     key={`${blockIdx}-${idx}`}
-                                    className="group relative aspect-[3/4] h-44 sm:h-52 flex-shrink-0 overflow-visible transition-colors"
+                                    className="group relative aspect-[3/4] h-32 sm:h-52 flex-shrink-0 overflow-visible transition-colors"
                                 >
                                     <div className="h-full w-full overflow-hidden rounded-2xl border border-gray-200/50 dark:border-white/10 shadow-sm dark:shadow-lg dark:border-gray-800">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}

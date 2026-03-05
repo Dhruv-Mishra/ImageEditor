@@ -13,8 +13,11 @@ export function Header() {
     // Landing page — no special handling needed
   }, []);
 
+  // Hide header on mobile when in edit view — bottom nav suffices
+  const hideOnMobile = pathname === '/edit';
+
   return (
-    <div className="sticky top-4 z-50 mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 pointer-events-none transition-all">
+    <div className={`sticky top-4 z-50 mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8 pointer-events-none transition-all ${hideOnMobile ? 'hidden sm:block' : ''}`}>
       <motion.header
         initial={{ y: -30, opacity: 0, scale: 0.95 }}
         animate={{ y: 0, opacity: 1, scale: 1 }}

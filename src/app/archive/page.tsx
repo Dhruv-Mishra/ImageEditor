@@ -493,15 +493,52 @@ export default function ArchivePage() {
             .sort((a, b) => (idOrder.get(a.id) ?? 999) - (idOrder.get(b.id) ?? 999));
     }, [filteredHistory, searchResults]);
 
-    /* ---- Filter sessions by search results too ---- */
+    /* ---- Filter + sort sessions (same filters as history where applicable) ---- */
+    const filteredSessions = useMemo(() => {
+        // Format and Size filters are export-specific — when active, hide sessions
+        // because sessions don't have exported blobs with MIME types or file sizes.
+        if (filterFormat !== 'all' || filterSize !== 'all') return [];
+
+        let result = [...sessions];
+
+        // Aspect ratio (use preview dimensions)
+        if (filterAspect !== 'all') {
+            result = result.filter((s) => {
+                const ratio = s.previewWidth / s.previewHeight;
+                if (filterAspect === 'square') return ratio > 0.9 && ratio < 1.1;
+                if (filterAspect === 'portrait') return ratio <= 0.9;
+                if (filterAspect === 'landscape') return ratio >= 1.1;
+                return true;
+            });
+        }
+
+        // Date range
+        if (filterDate !== 'all') {
+            result = result.filter((s) => matchesDateFilter(s.createdAt, filterDate));
+        }
+
+        // Sort
+        if (sortBy === 'newest') result.sort((a, b) => b.createdAt - a.createdAt);
+        else if (sortBy === 'oldest') result.sort((a, b) => a.createdAt - b.createdAt);
+        else if (sortBy === 'hr')
+            result.sort(
+                (a, b) =>
+                    b.naturalWidth * b.naturalHeight -
+                    a.naturalWidth * a.naturalHeight
+            );
+
+        return result;
+    }, [sessions, filterAspect, filterFormat, filterSize, filterDate, sortBy]);
+
+    /* ---- Apply search results as filter on sessions ---- */
     const displaySessions = useMemo(() => {
-        if (!searchResults) return sessions;
+        if (!searchResults) return filteredSessions;
         const searchIds = new Set(searchResults.map((r) => r.id));
         const idOrder = new Map(searchResults.map((r, i) => [r.id, i]));
-        return sessions
+        return filteredSessions
             .filter((s) => searchIds.has(s.id))
             .sort((a, b) => (idOrder.get(a.id) ?? 999) - (idOrder.get(b.id) ?? 999));
-    }, [sessions, searchResults]);
+    }, [filteredSessions, searchResults]);
 
     /* ---- Actual visible match count (for display) ---- */
     const visibleMatchCount = useMemo(() => {
@@ -624,7 +661,7 @@ export default function ArchivePage() {
             </div>
 
             {/* Filter bar */}
-            {history.length > 0 && (
+            {(history.length > 0 || sessions.length > 0) && (
                 <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 mb-6">
                     <div
                         className="flex flex-wrap items-center gap-2.5 justify-center sm:justify-end"
@@ -748,7 +785,7 @@ export default function ArchivePage() {
                                 {/* Info */}
                                 <div className="p-2">
                                     <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                                        {session.selectedCropType} · {session.aspectRatio}
+                                        {session.multiSuggestion?.crops.find(c => c.type === session.selectedCropType)?.label ?? session.selectedCropType} · {session.aspectRatio}
                                     </p>
                                     <p className="text-[10px] text-gray-500 dark:text-gray-400">
                                         {new Date(session.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
