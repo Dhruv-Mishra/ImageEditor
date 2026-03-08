@@ -221,15 +221,15 @@ if [ ! -f "${BACKEND_DIR}/venv/bin/activate" ]; then
 fi
 
 echo "  Installing Python dependencies (CPU-only PyTorch for ARM)…"
+
+# opencv-python (pulled by ultralytics) needs libGL — install it on headless servers
+apt-get install -y -qq libgl1 libglib2.0-0 2>/dev/null || true
+
 sudo -u "$APP_USER" bash -c "
   source '${BACKEND_DIR}/venv/bin/activate'
   pip install --quiet --upgrade pip
   pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu 2>/dev/null || true
   pip install --quiet -r '${BACKEND_DIR}/requirements.txt'
-  # ultralytics pulls in opencv-python which needs libGL (not on headless servers)
-  # Force-swap to headless variant
-  pip uninstall -y opencv-python 2>/dev/null || true
-  pip install --quiet opencv-python-headless
 "
 echo "  Python backend ready."
 
