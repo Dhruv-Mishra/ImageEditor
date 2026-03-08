@@ -33,7 +33,7 @@ BACKEND_PORT=8000
 # Reuse the existing wildcard cert (*.whoisdhruv.com) from the portfolio site
 SSL_CERT="/etc/ssl/cloudflare/whoisdhruv.com.pem"
 SSL_KEY="/etc/ssl/cloudflare/whoisdhruv.com.key"
-GIT_BRANCH="main"
+GIT_BRANCH="master"
 
 # Read resource limits from machine.conf if available
 if [ -f /etc/deploy/machine.conf ]; then
