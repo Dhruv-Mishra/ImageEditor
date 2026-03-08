@@ -226,6 +226,10 @@ sudo -u "$APP_USER" bash -c "
   pip install --quiet --upgrade pip
   pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu 2>/dev/null || true
   pip install --quiet -r '${BACKEND_DIR}/requirements.txt'
+  # ultralytics pulls in opencv-python which needs libGL (not on headless servers)
+  # Force-swap to headless variant
+  pip uninstall -y opencv-python 2>/dev/null || true
+  pip install --quiet opencv-python-headless
 "
 echo "  Python backend ready."
 
