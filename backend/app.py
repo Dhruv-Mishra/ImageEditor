@@ -269,8 +269,12 @@ app = FastAPI(title="Crop Suggestion API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # tighten in production
-    allow_methods=["*"],
+    allow_origins=[
+        "https://cropio.whoisdhruv.com",
+        "http://localhost:3000",
+        "http://localhost:3001",
+    ],
+    allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
 
@@ -340,4 +344,4 @@ async def health():
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8000)
