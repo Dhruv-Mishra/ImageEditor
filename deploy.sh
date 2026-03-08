@@ -215,7 +215,9 @@ if [ ! -d "venv" ]; then
 fi
 
 echo "  Installing Python dependencies (CPU-only PyTorch for ARM)…"
+BACKEND_DIR="${APP_DIR}/backend"
 sudo -u "$APP_USER" bash -c "
+  cd '${BACKEND_DIR}'
   source venv/bin/activate
   pip install --quiet --upgrade pip
   pip install --quiet torch torchvision --index-url https://download.pytorch.org/whl/cpu 2>/dev/null || true
