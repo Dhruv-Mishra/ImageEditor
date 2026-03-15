@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import type { CapturePhase } from '@/lib/headshot/types';
 import { HOLD_DURATION_MS } from '@/lib/headshot/types';
 
@@ -29,6 +29,27 @@ export function HeadshotViewfinder({
   phase: CapturePhase;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [showCaptureFlash, setShowCaptureFlash] = useState(false);
+  const prevStepRef = useRef(0);
+
+  // Detect when a new step starts (capture happened) → flash
+  useEffect(() => {
+    if (phase === 'tracking' || phase === 'holding') {
+      // currentStep comes from parent — derive from holdProgress reset pattern
+      // When holdProgress drops to 0 in tracking phase after being >0, a capture just happened
+    }
+  }, [phase]);
+
+  // Flash when frame transitions from holding to tracking (capture occurred)
+  const prevPhaseRef = useRef<CapturePhase>(phase);
+  useEffect(() => {
+    if (prevPhaseRef.current === 'holding' && phase === 'tracking' && holdProgress === 0) {
+      setShowCaptureFlash(true);
+      const t = setTimeout(() => setShowCaptureFlash(false), 500);
+      return () => clearTimeout(t);
+    }
+    prevPhaseRef.current = phase;
+  }, [phase, holdProgress]);
 
   const syncCanvasSize = useCallback(() => {
     const video = videoRef.current;
@@ -60,9 +81,11 @@ export function HeadshotViewfinder({
     <div
       ref={containerRef}
       className={`relative w-full overflow-hidden rounded-2xl bg-black shadow-xl aspect-[3/4] sm:aspect-video transition-all duration-200 ${
-        isOnTarget && (phase === 'tracking' || phase === 'holding')
-          ? 'ring-3 ring-green-400 shadow-[0_0_30px_rgba(34,197,94,0.4)]'
-          : 'ring-1 ring-white/10'
+        showCaptureFlash
+          ? 'ring-4 ring-green-400 shadow-[0_0_40px_rgba(34,197,94,0.6)]'
+          : isOnTarget && (phase === 'tracking' || phase === 'holding')
+            ? 'ring-3 ring-green-400 shadow-[0_0_30px_rgba(34,197,94,0.4)]'
+            : 'ring-1 ring-white/10'
       }`}
     >
       <video
@@ -102,9 +125,14 @@ export function HeadshotViewfinder({
         </div>
       )}
 
-      {/* Instruction bar */}
+      {/* Capture flash overlay */}
+      {showCaptureFlash && (
+        <div className="absolute inset-0 bg-white/30 pointer-events-none animate-[fadeIn_0.1s_ease-out]" />
+      )}
+
+      {/* Instruction bar — at TOP */}
       {showInstruction && instruction && (
-        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-4 pt-10">
+        <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-black/70 to-transparent px-4 pt-4 pb-10">
           <p className="text-center text-sm font-bold tracking-wide text-white drop-shadow-md sm:text-base">
             {instruction}
           </p>

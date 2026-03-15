@@ -35,15 +35,21 @@ export function drawPoseArrow(
 ): void {
   const unit = Math.min(canvasWidth, canvasHeight);
 
-  // === HALO RING around face ===
-  const ringRadius = faceScale * canvasHeight * 0.7;
+  // === HALO RING — anchored near canvas center, gently follows face ===
+  const anchorX = canvasWidth / 2;
+  const anchorY = canvasHeight * 0.42;
+  const followStrength = 0.15; // how much the ring follows the face (0=fixed, 1=tracks)
+  const ringCenterX = anchorX + (faceCenterX - anchorX) * followStrength;
+  const ringCenterY = anchorY + (faceCenterY - anchorY) * followStrength;
+
+  const ringRadius = Math.min(canvasWidth, canvasHeight) * 0.28;
   const ringStroke = Math.max(3, unit * 0.005);
 
   ctx.save();
 
-  // Base ring (dim white)
+  // Base ring
   ctx.beginPath();
-  ctx.arc(faceCenterX, faceCenterY, ringRadius, 0, Math.PI * 2);
+  ctx.arc(ringCenterX, ringCenterY, ringRadius, 0, Math.PI * 2);
   ctx.strokeStyle = isOnTarget
     ? 'rgba(34, 197, 94, 0.3)'
     : 'rgba(100, 180, 255, 0.15)';
@@ -59,8 +65,8 @@ export function drawPoseArrow(
 
     ctx.beginPath();
     ctx.arc(
-      faceCenterX,
-      faceCenterY,
+      ringCenterX,
+      ringCenterY,
       arcRadius,
       sector.startAngle,
       sector.startAngle + sector.sweepAngle,
@@ -82,10 +88,10 @@ export function drawPoseArrow(
     // Small tick marks at sector edges
     const tickLen = unit * 0.015;
     for (const edgeAngle of [sector.startAngle, sector.startAngle + sector.sweepAngle]) {
-      const tx = faceCenterX + Math.cos(edgeAngle) * (arcRadius - tickLen);
-      const ty = faceCenterY + Math.sin(edgeAngle) * (arcRadius - tickLen);
-      const tex = faceCenterX + Math.cos(edgeAngle) * (arcRadius + tickLen);
-      const tey = faceCenterY + Math.sin(edgeAngle) * (arcRadius + tickLen);
+      const tx = ringCenterX + Math.cos(edgeAngle) * (arcRadius - tickLen);
+      const ty = ringCenterY + Math.sin(edgeAngle) * (arcRadius - tickLen);
+      const tex = ringCenterX + Math.cos(edgeAngle) * (arcRadius + tickLen);
+      const tey = ringCenterY + Math.sin(edgeAngle) * (arcRadius + tickLen);
       ctx.beginPath();
       ctx.moveTo(tx, ty);
       ctx.lineTo(tex, tey);
