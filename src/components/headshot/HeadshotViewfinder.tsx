@@ -1,24 +1,32 @@
 'use client';
 
 import { useRef, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import type { CapturePhase } from '@/lib/headshot/types';
+import { HOLD_DURATION_MS } from '@/lib/headshot/types';
 
 /**
- * Manages the webcam <video> and overlay <canvas> elements.
- * Keeps canvas dimensions synced to the video's native resolution.
+ * Production-grade webcam viewfinder with:
+ * - Video + overlay canvas
+ * - Countdown ring + seconds text overlaid on the feed during hold
+ * - Green border flash on capture
+ * - Bottom instruction/tip bar
  */
 export function HeadshotViewfinder({
   videoRef,
   canvasRef,
   instruction,
-  tip,
   showInstruction,
+  holdProgress,
+  isOnTarget,
+  phase,
 }: {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   instruction?: string;
-  tip?: string;
   showInstruction?: boolean;
+  holdProgress: number;
+  isOnTarget: boolean;
+  phase: CapturePhase;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -26,7 +34,6 @@ export function HeadshotViewfinder({
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
-
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
   }, [videoRef, canvasRef]);
@@ -34,22 +41,28 @@ export function HeadshotViewfinder({
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-
     const handleResize = () => syncCanvasSize();
     video.addEventListener('loadedmetadata', handleResize);
     video.addEventListener('resize', handleResize);
-
     return () => {
       video.removeEventListener('loadedmetadata', handleResize);
       video.removeEventListener('resize', handleResize);
     };
   }, [videoRef, syncCanvasSize]);
 
+  const isHolding = phase === 'holding' && isOnTarget;
+  const secondsLeft = Math.ceil((1 - holdProgress) * (HOLD_DURATION_MS / 1000));
+  const circumference = 2 * Math.PI * 44;
+  const strokeOffset = circumference * (1 - holdProgress);
+
   return (
     <div
       ref={containerRef}
-      className="relative w-full overflow-hidden rounded-2xl bg-black shadow-2xl ring-1 ring-white/10"
-      style={{ aspectRatio: '16 / 9' }}
+      className={`relative w-full overflow-hidden rounded-2xl bg-black shadow-xl aspect-[3/4] sm:aspect-video transition-all duration-200 ${
+        isOnTarget && (phase === 'tracking' || phase === 'holding')
+          ? 'ring-3 ring-green-400 shadow-[0_0_30px_rgba(34,197,94,0.4)]'
+          : 'ring-1 ring-white/10'
+      }`}
     >
       <video
         ref={videoRef}
@@ -63,31 +76,39 @@ export function HeadshotViewfinder({
         className="absolute inset-0 h-full w-full object-cover pointer-events-none"
       />
 
-      {/* Overlaid instruction bar */}
-      <AnimatePresence>
-        {showInstruction && instruction && (
-          <motion.div
-            key={instruction}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent px-4 pb-5 pt-12 backdrop-blur-sm"
-          >
-            <p className="text-center text-base font-bold tracking-wide text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] sm:text-lg">
-              {instruction}
-            </p>
-            {tip && (
-              <p className="mt-1.5 text-center text-xs font-medium tracking-wide text-white/70 sm:text-sm">
-                {tip}
-              </p>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Hold countdown — large ring + seconds on the video feed */}
+      {isHolding && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="relative flex items-center justify-center">
+            <svg width={100} height={100} className="-rotate-90">
+              <circle
+                cx={50} cy={50} r={44}
+                fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={4}
+              />
+              <circle
+                cx={50} cy={50} r={44}
+                fill="none" stroke="#22c55e" strokeWidth={5}
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeOffset}
+                className="transition-[stroke-dashoffset] duration-100"
+              />
+            </svg>
+            <span className="absolute text-3xl font-black text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] tabular-nums">
+              {secondsLeft}
+            </span>
+          </div>
+        </div>
+      )}
 
-      {/* Corner decoration */}
-      <div className="absolute inset-0 pointer-events-none rounded-2xl ring-1 ring-inset ring-white/10" />
+      {/* Instruction bar */}
+      {showInstruction && instruction && (
+        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent px-4 pb-4 pt-10">
+          <p className="text-center text-sm font-bold tracking-wide text-white drop-shadow-md sm:text-base">
+            {instruction}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

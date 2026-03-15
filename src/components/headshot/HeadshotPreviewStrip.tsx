@@ -1,10 +1,9 @@
 'use client';
 
-import { motion } from 'framer-motion';
 import type { CapturedFrame } from '@/lib/headshot/types';
 
 /**
- * Thumbnail strip showing captured frames at the bottom of the capture UI.
+ * Thumbnail strip showing captured frames. Pure CSS, no animation library.
  */
 export function HeadshotPreviewStrip({ frames }: { frames: CapturedFrame[] }) {
   if (frames.length === 0) return null;
@@ -12,12 +11,7 @@ export function HeadshotPreviewStrip({ frames }: { frames: CapturedFrame[] }) {
   return (
     <div className="flex gap-3 justify-center flex-wrap">
       {frames.map((frame, i) => (
-        <motion.div
-          key={i}
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="relative"
-        >
+        <div key={i} className="relative animate-[fadeIn_0.3s_ease-out]">
           <img
             src={frame.dataUrl}
             alt={`Captured: ${frame.poseLabel}`}
@@ -26,7 +20,7 @@ export function HeadshotPreviewStrip({ frames }: { frames: CapturedFrame[] }) {
           <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-green-500 px-2 py-0.5 text-[10px] font-bold text-white shadow">
             {frame.poseLabel}
           </span>
-        </motion.div>
+        </div>
       ))}
     </div>
   );

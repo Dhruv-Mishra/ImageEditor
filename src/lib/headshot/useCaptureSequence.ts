@@ -3,8 +3,8 @@
 import { useRef, useCallback, useState } from 'react';
 import type { CapturePhase, CapturedFrame } from './types';
 import { POSE_SEQUENCE, HOLD_DURATION_MS } from './types';
-import { isPoseOnTarget, isFacePositioned } from './posemath';
-import { drawPoseArrow, drawCaptureFlash, drawFaceGuide } from './canvasDrawing';
+import { isPoseOnTarget } from './posemath';
+import { drawPoseArrow, drawCaptureFlash } from './canvasDrawing';
 import type { FaceTrackingResult } from './useMediaPipeFace';
 
 interface CaptureState {
@@ -14,7 +14,6 @@ interface CaptureState {
   holdProgress: number; // 0–1
   isOnTarget: boolean;
   instruction: string;
-  tip: string;
   errorMessage: string | null;
 }
 
@@ -25,7 +24,6 @@ const INITIAL_STATE: CaptureState = {
   holdProgress: 0,
   isOnTarget: false,
   instruction: '',
-  tip: '',
   errorMessage: null,
 };
 
@@ -42,6 +40,7 @@ export function useCaptureSequence(
   const stateRef = useRef<CaptureState>(INITIAL_STATE);
   const holdStartRef = useRef<number | null>(null);
   const capturedInStepRef = useRef(false);
+  const offTargetCountRef = useRef(0);
 
   /** Update both the ref mirror and React state atomically. */
   const updateState = useCallback((next: CaptureState) => {
@@ -98,14 +97,14 @@ export function useCaptureSequence(
   const startSequence = useCallback(() => {
     capturedInStepRef.current = false;
     holdStartRef.current = null;
+    offTargetCountRef.current = 0;
     const next: CaptureState = {
-      phase: 'positioning',
+      phase: 'tracking',
       currentStep: 0,
       frames: [],
       holdProgress: 0,
       isOnTarget: false,
-      instruction: 'Position your face inside the oval guide',
-      tip: 'Find good lighting for best results \u{1F4A1}',
+      instruction: POSE_SEQUENCE[0].instruction,
       errorMessage: null,
     };
     updateState(next);
@@ -139,51 +138,6 @@ export function useCaptureSequence(
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext('2d');
 
-      // --- Positioning phase: show face guide, wait for face to be centered ---
-      if (prev.phase === 'positioning') {
-        if (!ctx || !canvas) return;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        if (!result.hasFace) {
-          holdStartRef.current = null;
-          drawFaceGuide(ctx, canvas.width, canvas.height, false, 1);
-          updateState({ ...prev, holdProgress: 0, isOnTarget: false });
-          return;
-        }
-
-        const positioned = isFacePositioned(
-          result.faceCenterX, result.faceCenterY, result.faceScale,
-          canvas.width, canvas.height,
-        );
-
-        drawFaceGuide(ctx, canvas.width, canvas.height, positioned, 1);
-
-        if (positioned) {
-          const now = performance.now();
-          if (!holdStartRef.current) holdStartRef.current = now;
-          const elapsed = now - holdStartRef.current;
-          const progress = Math.min(elapsed / 1000, 1);
-
-          if (progress >= 1) {
-            holdStartRef.current = null;
-            updateState({
-              ...prev,
-              phase: 'tracking',
-              holdProgress: 0,
-              isOnTarget: false,
-              instruction: POSE_SEQUENCE[0].instruction,
-              tip: POSE_SEQUENCE[0].tip,
-            });
-          } else {
-            updateState({ ...prev, holdProgress: progress, isOnTarget: true });
-          }
-        } else {
-          holdStartRef.current = null;
-          updateState({ ...prev, holdProgress: 0, isOnTarget: false });
-        }
-        return;
-      }
-
       // --- Tracking / Holding phases ---
       if (prev.phase !== 'tracking' && prev.phase !== 'holding') return;
       if (prev.currentStep >= POSE_SEQUENCE.length) return;
@@ -194,7 +148,6 @@ export function useCaptureSequence(
         holdStartRef.current = null;
         if (ctx && canvas) {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
-          drawFaceGuide(ctx, canvas.width, canvas.height, false, 0.25);
         }
         updateState({ ...prev, phase: 'tracking', holdProgress: 0, isOnTarget: false });
         return;
@@ -206,19 +159,39 @@ export function useCaptureSequence(
       const displayX = canvas ? canvas.width - result.foreheadX : result.foreheadX;
       const displayY = result.foreheadY;
 
+      // Compute face-perpendicular direction (face center → forehead)
+      const mirroredCenterX = canvas ? canvas.width - result.faceCenterX : result.faceCenterX;
+      const fUpX = displayX - mirroredCenterX;
+      const fUpY = displayY - result.faceCenterY;
+      const fUpMag = Math.sqrt(fUpX * fUpX + fUpY * fUpY) || 1;
+
       if (ctx && canvas) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawFaceGuide(ctx, canvas.width, canvas.height, true, 0.2);
-        drawPoseArrow(ctx, displayX, displayY, result.pose, onTarget, canvas.width, canvas.height);
+        drawPoseArrow(
+          ctx, displayX, displayY, result.pose, onTarget,
+          canvas.width, canvas.height, target.yaw, target.pitch,
+          fUpX / fUpMag, fUpY / fUpMag,
+          mirroredCenterX, result.faceCenterY, result.faceScale,
+        );
       }
 
-      // Not on target — reset hold timer
+      // Not on target — allow grace period (3 consecutive frames) before resetting hold
       if (!onTarget) {
-        holdStartRef.current = null;
-        capturedInStepRef.current = false;
-        updateState({ ...prev, phase: 'tracking', holdProgress: 0, isOnTarget: false });
+        if (holdStartRef.current !== null) {
+          offTargetCountRef.current++;
+          if (offTargetCountRef.current > 6) {
+            holdStartRef.current = null;
+            capturedInStepRef.current = false;
+            offTargetCountRef.current = 0;
+            updateState({ ...prev, phase: 'tracking', holdProgress: 0, isOnTarget: false });
+          }
+        } else {
+          updateState({ ...prev, phase: 'tracking', holdProgress: 0, isOnTarget: false });
+        }
         return;
       }
+
+      offTargetCountRef.current = 0;
 
       // On target — accumulate hold time
       const now = performance.now();
@@ -262,7 +235,6 @@ export function useCaptureSequence(
               holdProgress: 1,
               isOnTarget: true,
               instruction: 'All poses captured!',
-              tip: 'Great job! \u{1F389}',
             });
             return;
           }
@@ -278,7 +250,6 @@ export function useCaptureSequence(
             holdProgress: 0,
             isOnTarget: false,
             instruction: POSE_SEQUENCE[nextStep].instruction,
-            tip: POSE_SEQUENCE[nextStep].tip,
           });
           return;
         }
@@ -333,6 +304,7 @@ export function useCaptureSequence(
   const reset = useCallback(() => {
     holdStartRef.current = null;
     capturedInStepRef.current = false;
+    offTargetCountRef.current = 0;
     updateState(INITIAL_STATE);
   }, [updateState]);
 

@@ -35,8 +35,8 @@ export function estimateHeadPose(landmarks: Landmark[]): HeadPose {
   // When looking down, nose tip moves down relative to the midpoint of forehead–chin.
   const faceHeight = chin.y - forehead.y;
   const noseFraction = (noseTip.y - forehead.y) / (faceHeight + 1e-6);
-  // Neutral is ~0.38; looking down pushes it higher, looking up pushes it lower
-  const pitchOffset = noseFraction - 0.38;
+  // Neutral is ~0.45 for typical faces; looking down pushes it higher, looking up lower
+  const pitchOffset = noseFraction - 0.45;
   const pitch = pitchOffset * 120; // empirical degrees
 
   // --- Roll (head tilt) ---
@@ -53,7 +53,7 @@ export function estimateHeadPose(landmarks: Landmark[]): HeadPose {
 export function isPoseOnTarget(pose: HeadPose, target: PoseTarget): boolean {
   const pitchDiff = Math.abs(pose.pitch - target.pitch);
   const yawDiff = Math.abs(pose.yaw - target.yaw);
-  return pitchDiff <= target.thresholdDeg && yawDiff <= target.thresholdDeg;
+  return pitchDiff <= target.pitchThreshold && yawDiff <= target.yawThreshold;
 }
 
 /**

@@ -1,15 +1,27 @@
 import type { HeadPose } from './types';
 
+// Arc positions mapped to target directions (angles on the halo ring)
+const SECTOR_MAP: Record<string, { startAngle: number; sweepAngle: number }> = {
+  left: { startAngle: Math.PI * 0.75, sweepAngle: Math.PI * 0.5 },   // left side
+  right: { startAngle: -Math.PI * 0.25, sweepAngle: Math.PI * 0.5 }, // right side
+  up: { startAngle: -Math.PI * 0.75, sweepAngle: Math.PI * 0.5 },    // top
+  down: { startAngle: Math.PI * 0.25, sweepAngle: Math.PI * 0.5 },   // bottom
+};
+
+function getSectorKey(targetYaw: number, targetPitch: number): string | null {
+  if (Math.abs(targetYaw) < 2 && Math.abs(targetPitch) < 2) return null; // straight
+  if (targetYaw < -5) return 'left';
+  if (targetYaw > 5) return 'right';
+  if (targetPitch < -3) return 'up';
+  if (targetPitch > 3) return 'down';
+  return null;
+}
+
 /**
- * Draw a flat, wide chevron directional indicator on the overlay canvas.
- *
- * The chevron originates near (ox, oy) — the mirrored forehead position.
- * Direction determined by current head pose (pitch/yaw).
- * Color is green when on-target, red otherwise.
- *
- * Caller must mirror the X coordinate before passing (canvas is un-flipped,
- * video is CSS-mirrored). Yaw is negated here to map from body-space to
- * mirrored-screen-space.
+ * Draw a Kinect-style tracking overlay:
+ * - Glowing halo ring around the face center
+ * - Target arc sector on the ring (highlighted region to aim for)
+ * - Perpendicular arrow emerging from forehead dot
  *
  * Does NOT call clearRect — caller handles that.
  */
@@ -21,75 +33,129 @@ export function drawPoseArrow(
   isOnTarget: boolean,
   canvasWidth: number,
   canvasHeight: number,
+  targetYaw: number,
+  targetPitch: number,
+  faceUpX: number,
+  faceUpY: number,
+  faceCenterX: number,
+  faceCenterY: number,
+  faceScale: number,
 ): void {
-  const color = isOnTarget ? '#22c55e' : '#ef4444';
-  const glowColor = isOnTarget ? 'rgba(34, 197, 94, 0.6)' : 'rgba(239, 68, 68, 0.5)';
   const unit = Math.min(canvasWidth, canvasHeight);
 
-  // Chevron sizing — wide and flat
-  const chevronLen = unit * 0.055;
-  const chevronSpread = unit * 0.065;
-  const strokeW = Math.max(6, unit * 0.01);
-  const dotR = Math.max(8, unit * 0.014);
-  const offsetDist = unit * 0.04;
-
-  // Yaw maps directly: positive yaw = user looks right = arrow points right on mirrored display
-  // (X is already mirrored by caller, so no negation needed)
-  const yawRad = (pose.yaw * Math.PI) / 180;
-  const pitchRad = (pose.pitch * Math.PI) / 180;
-
-  const dirX = Math.sin(yawRad);
-  const dirY = Math.sin(pitchRad);
-  const magnitude = Math.sqrt(dirX * dirX + dirY * dirY);
+  // === HALO RING around face ===
+  const ringRadius = faceScale * canvasHeight * 0.7;
+  const ringStroke = Math.max(3, unit * 0.005);
 
   ctx.save();
-  ctx.shadowColor = glowColor;
-  ctx.shadowBlur = 20;
 
-  // Only draw chevron if there's meaningful direction (avoids wild spin near center)
-  if (magnitude > 0.12) {
-    const nx = dirX / magnitude;
-    const ny = dirY / magnitude;
-    const px = -ny; // perpendicular
-    const py = nx;
+  // Base ring (dim white)
+  ctx.beginPath();
+  ctx.arc(faceCenterX, faceCenterY, ringRadius, 0, Math.PI * 2);
+  ctx.strokeStyle = isOnTarget
+    ? 'rgba(34, 197, 94, 0.3)'
+    : 'rgba(100, 180, 255, 0.15)';
+  ctx.lineWidth = ringStroke;
+  ctx.stroke();
 
-    // Chevron center (offset from origin dot)
-    const cx = ox + nx * offsetDist;
-    const cy = oy + ny * offsetDist;
-
-    // Tip (front of chevron)
-    const tipX = cx + nx * chevronLen;
-    const tipY = cy + ny * chevronLen;
-
-    // Back arms (two wide ends of the V)
-    const arm1X = cx - px * chevronSpread;
-    const arm1Y = cy - py * chevronSpread;
-    const arm2X = cx + px * chevronSpread;
-    const arm2Y = cy + py * chevronSpread;
+  // === TARGET ARC SECTOR ===
+  const sectorKey = getSectorKey(targetYaw, targetPitch);
+  if (sectorKey) {
+    const sector = SECTOR_MAP[sectorKey];
+    const arcRadius = ringRadius + unit * 0.012;
+    const arcStroke = Math.max(5, unit * 0.009);
 
     ctx.beginPath();
-    ctx.moveTo(arm1X, arm1Y);
-    ctx.lineTo(tipX, tipY);
-    ctx.lineTo(arm2X, arm2Y);
-    ctx.strokeStyle = color;
-    ctx.lineWidth = strokeW;
+    ctx.arc(
+      faceCenterX,
+      faceCenterY,
+      arcRadius,
+      sector.startAngle,
+      sector.startAngle + sector.sweepAngle,
+    );
+    ctx.strokeStyle = isOnTarget
+      ? 'rgba(34, 197, 94, 0.7)'
+      : 'rgba(100, 180, 255, 0.5)';
+    ctx.lineWidth = arcStroke;
     ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+
+    // Glow
+    ctx.shadowColor = isOnTarget
+      ? 'rgba(34, 197, 94, 0.6)'
+      : 'rgba(100, 180, 255, 0.4)';
+    ctx.shadowBlur = 12;
     ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Small tick marks at sector edges
+    const tickLen = unit * 0.015;
+    for (const edgeAngle of [sector.startAngle, sector.startAngle + sector.sweepAngle]) {
+      const tx = faceCenterX + Math.cos(edgeAngle) * (arcRadius - tickLen);
+      const ty = faceCenterY + Math.sin(edgeAngle) * (arcRadius - tickLen);
+      const tex = faceCenterX + Math.cos(edgeAngle) * (arcRadius + tickLen);
+      const tey = faceCenterY + Math.sin(edgeAngle) * (arcRadius + tickLen);
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(tex, tey);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
   }
 
+  // === PERPENDICULAR ARROW from forehead ===
+  const color = isOnTarget ? '#22c55e' : '#ef4444';
+  const glow = isOnTarget ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.4)';
+
+  const nx = faceUpX;
+  const ny = faceUpY;
+  const px = -ny;
+  const py = nx;
+
+  const dotR = Math.max(5, unit * 0.009);
+  const shaftStart = dotR + 2;
+  const shaftLen = unit * 0.08;
+  const headLen = unit * 0.022;
+  const headW = unit * 0.016;
+  const shaftW = Math.max(2.5, unit * 0.005);
+
+  const sx = ox + nx * shaftStart;
+  const sy = oy + ny * shaftStart;
+  const ex = ox + nx * (shaftStart + shaftLen);
+  const ey = oy + ny * (shaftStart + shaftLen);
+
+  ctx.shadowColor = glow;
+  ctx.shadowBlur = 6;
+
+  // Shaft
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.lineTo(ex, ey);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = shaftW;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Arrowhead
+  ctx.beginPath();
+  ctx.moveTo(ex + nx * headLen, ey + ny * headLen);
+  ctx.lineTo(ex + px * headW, ey + py * headW);
+  ctx.lineTo(ex - px * headW, ey - py * headW);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+
   // Origin dot
+  ctx.shadowBlur = 0;
   ctx.beginPath();
   ctx.arc(ox, oy, dotR, 0, Math.PI * 2);
   ctx.fillStyle = color;
   ctx.fill();
 
-  // White ring around origin
-  ctx.shadowBlur = 0;
   ctx.beginPath();
-  ctx.arc(ox, oy, dotR + 3, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-  ctx.lineWidth = 2;
+  ctx.arc(ox, oy, dotR + 2, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 1.5;
   ctx.stroke();
 
   ctx.restore();
@@ -108,7 +174,6 @@ export function drawCaptureFlash(
   ctx.fillStyle = `rgba(34, 197, 94, ${alpha * 0.3})`;
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-  // Checkmark icon in center
   const cx = canvasWidth / 2;
   const cy = canvasHeight / 2;
   const size = Math.min(canvasWidth, canvasHeight) * 0.1;
@@ -124,58 +189,4 @@ export function drawCaptureFlash(
   ctx.stroke();
 }
 
-/**
- * Draw a head-shaped oval positioning guide in the center of the canvas.
- * Turns green when face is positioned correctly, white/dim otherwise.
- * Does NOT call clearRect — caller handles that.
- */
-export function drawFaceGuide(
-  ctx: CanvasRenderingContext2D,
-  canvasWidth: number,
-  canvasHeight: number,
-  isPositioned: boolean,
-  opacity: number,
-): void {
-  const guideX = canvasWidth / 2;
-  const guideY = canvasHeight * 0.42;
-  const guideRx = canvasWidth * 0.12;
-  const guideRy = canvasHeight * 0.28;
 
-  const color = isPositioned
-    ? `rgba(34, 197, 94, ${opacity * 0.8})`
-    : `rgba(255, 255, 255, ${opacity * 0.35})`;
-  const glowColor = isPositioned
-    ? `rgba(34, 197, 94, ${opacity * 0.3})`
-    : 'transparent';
-
-  ctx.save();
-
-  if (isPositioned) {
-    ctx.shadowColor = glowColor;
-    ctx.shadowBlur = 20;
-  }
-
-  // Dashed oval
-  ctx.beginPath();
-  ctx.ellipse(guideX, guideY, guideRx, guideRy, 0, 0, Math.PI * 2);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = isPositioned ? 3.5 : 2.5;
-  ctx.setLineDash(isPositioned ? [] : [14, 8]);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Small crosshair at center when not positioned
-  if (!isPositioned && opacity > 0.5) {
-    const chSize = 8;
-    ctx.beginPath();
-    ctx.moveTo(guideX - chSize, guideY);
-    ctx.lineTo(guideX + chSize, guideY);
-    ctx.moveTo(guideX, guideY - chSize);
-    ctx.lineTo(guideX, guideY + chSize);
-    ctx.strokeStyle = `rgba(255, 255, 255, ${opacity * 0.4})`;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-  }
-
-  ctx.restore();
-}

@@ -40,9 +40,9 @@ export function useMediaPipeFace(
   const smoothedPosRef = useRef({ x: 0, y: 0 });
   const smoothedFaceRef = useRef({ centerX: 0, centerY: 0, scale: 0 });
   const smoothingInitRef = useRef(false);
-  const POSE_ALPHA = 0.2;
-  const POSITION_ALPHA = 0.15;
-  const FACE_ALPHA = 0.18;
+  const POSE_ALPHA = 0.4;
+  const POSITION_ALPHA = 0.25;
+  const FACE_ALPHA = 0.2;
 
   // Keep callback ref fresh without re-triggering effects
   useEffect(() => {
