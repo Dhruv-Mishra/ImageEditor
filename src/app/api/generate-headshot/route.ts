@@ -5,6 +5,23 @@ import { HEADSHOT_STYLES } from '@/lib/headshot/templates';
 const HF_SPACE = 'ByteDance/DreamO';
 const TIMEOUT_MS = 180_000; // 3 minutes (ZeroGPU cold-start + generation)
 
+/** Discover the correct API endpoint name from the Space. */
+async function discoverEndpoint(client: InstanceType<typeof Client>): Promise<string> {
+  try {
+    const api = await client.view_api();
+    const endpoints = Object.keys(api.named_endpoints || {});
+    console.log('[generate-headshot] Available endpoints:', endpoints);
+    const match = endpoints.find(
+      (ep) => ep.toLowerCase().includes('generate') || ep.toLowerCase().includes('predict'),
+    );
+    if (match) return match;
+    if (endpoints.length > 0) return endpoints[0];
+  } catch (err) {
+    console.warn('[generate-headshot] view_api failed, using fallback:', err);
+  }
+  return '/predict';
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -19,7 +36,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid image format' }, { status: 400 });
     }
 
-    // Look up the style prompt
     const style = HEADSHOT_STYLES.find((s) => s.id === body.styleId);
     if (!style) {
       return NextResponse.json({ error: 'Unknown style' }, { status: 400 });
@@ -30,57 +46,75 @@ export async function POST(request: NextRequest) {
     const sourceBuffer = Buffer.from(base64Data, 'base64');
     const sourceBlob = new Blob([new Uint8Array(sourceBuffer)], { type: 'image/webp' });
 
-    // Connect to DreamO on HF ZeroGPU
     const client = await Client.connect(HF_SPACE);
+    const endpoint = await discoverEndpoint(client);
+    console.log('[generate-headshot] Using endpoint:', endpoint);
 
-    // Generate with ID preservation: face photo as ref_image1 with task "id"
-    // ref_image2 is required by the API but can be null for single-reference generation
-    const resultPromise = client.predict('/Generate', [
+    // DreamO v1.1 generate_image parameter order (17 params)
+    const resultPromise = client.predict(endpoint, [
       handle_file(sourceBlob),  // ref_image1
-      'id',                     // task_for_ref1
-      null,                     // ref_image2 (unused)
-      'ip',                     // task_for_ref2 (default, unused)
+      null,                     // ref_image2  (unused)
+      'id',                     // ref_task1   (face ID preservation)
+      'ip',                     // ref_task2   (default, unused)
       style.prompt,             // prompt
-      1024,                     // Width
-      1024,                     // Height
-      16,                       // num_steps
-      4.5,                      // guidance
-      -1,                       // seed
-      512,                      // resolution for ref image
+      '-1',                     // seed        (random)
+      768,                      // width       (reduced for faster generation)
+      768,                      // height      (reduced for faster generation)
+      512,                      // ref_res
+      12,                       // num_steps   (v1.1 turbo default)
+      4.5,                      // guidance    (v1.1 default)
+      1,                        // true_cfg
+      0,                        // cfg_start_step
+      0,                        // cfg_end_step
+      '',                       // neg_prompt
+      3.5,                      // neg_guidance
+      0,                        // first_step_guidance
     ]);
 
-    // Enforce timeout
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(
+    // Enforce timeout — clear on resolution to avoid leaking the timer
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(
         () => reject(new Error('Generation timed out. The AI service may be starting up — please try again.')),
         TIMEOUT_MS,
-      ),
-    );
+      );
+    });
 
-    const result = await Promise.race([resultPromise, timeoutPromise]);
+    let result;
+    try {
+      result = await Promise.race([resultPromise, timeoutPromise]);
+      clearTimeout(timeoutId!);
+    } catch (raceErr) {
+      clearTimeout(timeoutId!);
+      resultPromise.catch(() => {});
+      throw raceErr;
+    }
 
-    // DreamO returns [generated_image, preprocess_output, seed]
+    // DreamO returns [generated_image, debug_images, seed]
     const data = result.data as Array<{ url?: string } | string | number | null>;
     const output = data?.[0] as { url?: string } | null;
     if (!output?.url) {
       return NextResponse.json({ error: 'No image generated' }, { status: 502 });
     }
 
-    // Fetch the generated image from HF's temporary URL
     const imageRes = await fetch(output.url);
     if (!imageRes.ok) {
       return NextResponse.json({ error: 'Failed to retrieve generated image' }, { status: 502 });
     }
 
-    const imageArrayBuffer = await imageRes.arrayBuffer();
-    const imageBase64 = Buffer.from(imageArrayBuffer).toString('base64');
+    // Stream the image directly as binary — avoids base64 encoding overhead
+    const imageBuffer = await imageRes.arrayBuffer();
     const contentType = imageRes.headers.get('content-type') || 'image/png';
 
-    return NextResponse.json({
-      image: `data:${contentType};base64,${imageBase64}`,
-      styleId: body.styleId,
+    return new NextResponse(imageBuffer, {
+      status: 200,
+      headers: {
+        'Content-Type': contentType,
+        'X-Style-Id': body.styleId,
+      },
     });
   } catch (err) {
+    console.error('[generate-headshot] Error:', err);
     const message = err instanceof Error ? err.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });
   }

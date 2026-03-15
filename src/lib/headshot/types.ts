@@ -35,27 +35,27 @@ export interface CapturedFrame {
 /** The 5-pose capture sequence */
 export const POSE_SEQUENCE: PoseTarget[] = [
   {
+    label: 'Left',
+    instruction: 'Turn your head to the Left',
+    pitch: 0,
+    yaw: -30,
+    pitchThreshold: 18,
+    yawThreshold: 30,
+  },
+  {
+    label: 'Right',
+    instruction: 'Turn your head to the Right',
+    pitch: 0,
+    yaw: 30,
+    pitchThreshold: 18,
+    yawThreshold: 30,
+  },
+  {
     label: 'Straight',
     instruction: 'Look straight at the camera',
     pitch: 0,
     yaw: 0,
     pitchThreshold: 14,
-    yawThreshold: 16,
-  },
-  {
-    label: 'Left',
-    instruction: 'Turn your head slightly Left',
-    pitch: 0,
-    yaw: -18,
-    pitchThreshold: 18,
-    yawThreshold: 16,
-  },
-  {
-    label: 'Right',
-    instruction: 'Turn your head slightly Right',
-    pitch: 0,
-    yaw: 18,
-    pitchThreshold: 18,
     yawThreshold: 16,
   },
   {

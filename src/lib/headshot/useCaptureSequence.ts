@@ -15,6 +15,7 @@ interface CaptureState {
   isOnTarget: boolean;
   instruction: string;
   errorMessage: string | null;
+  captureCount: number;
 }
 
 const INITIAL_STATE: CaptureState = {
@@ -25,6 +26,7 @@ const INITIAL_STATE: CaptureState = {
   isOnTarget: false,
   instruction: '',
   errorMessage: null,
+  captureCount: 0,
 };
 
 /**
@@ -42,6 +44,7 @@ export function useCaptureSequence(
   const capturedInStepRef = useRef(false);
   const offTargetCountRef = useRef(0);
   const flashIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cooldownUntilRef = useRef(0);
 
   /** Update both the ref mirror and React state atomically. */
   const updateState = useCallback((next: CaptureState) => {
@@ -99,6 +102,7 @@ export function useCaptureSequence(
     capturedInStepRef.current = false;
     holdStartRef.current = null;
     offTargetCountRef.current = 0;
+    cooldownUntilRef.current = 0;
     const next: CaptureState = {
       phase: 'tracking',
       currentStep: 0,
@@ -107,6 +111,7 @@ export function useCaptureSequence(
       isOnTarget: false,
       instruction: POSE_SEQUENCE[0].instruction,
       errorMessage: null,
+      captureCount: 0,
     };
     updateState(next);
   }, [updateState]);
@@ -118,14 +123,20 @@ export function useCaptureSequence(
     const video = videoRef.current;
     if (!video) return null;
 
+    // Downscale to max 1280px on longest side for smaller payloads
+    const MAX_DIM = 1280;
+    const scale = Math.min(1, MAX_DIM / Math.max(video.videoWidth, video.videoHeight));
+    const w = Math.round(video.videoWidth * scale);
+    const h = Math.round(video.videoHeight * scale);
+
     const captureCanvas = document.createElement('canvas');
-    captureCanvas.width = video.videoWidth;
-    captureCanvas.height = video.videoHeight;
+    captureCanvas.width = w;
+    captureCanvas.height = h;
     const ctx = captureCanvas.getContext('2d');
     if (!ctx) return null;
 
-    ctx.drawImage(video, 0, 0);
-    return captureCanvas.toDataURL('image/webp', 0.8);
+    ctx.drawImage(video, 0, 0, w, h);
+    return captureCanvas.toDataURL('image/webp', 0.75);
   }, [videoRef]);
 
   /**
@@ -143,6 +154,16 @@ export function useCaptureSequence(
       if (prev.phase !== 'tracking' && prev.phase !== 'holding') return;
       if (prev.currentStep >= POSE_SEQUENCE.length) return;
 
+      // Cooldown period after capture — suppress tracking so green ring disappears
+      const now = performance.now();
+      if (now < cooldownUntilRef.current) {
+        if (ctx && canvas) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        updateState({ ...prev, phase: 'tracking', holdProgress: 0, isOnTarget: false });
+        return;
+      }
+
       const target = POSE_SEQUENCE[prev.currentStep];
 
       if (!result.hasFace) {
@@ -154,7 +175,7 @@ export function useCaptureSequence(
         return;
       }
 
-      const onTarget = isPoseOnTarget(result.pose, target);
+      const onTarget = isPoseOnTarget(result.pose, target, prev.isOnTarget);
 
       // Mirror X for display (canvas is not CSS-flipped, but video is)
       const mirroredCenterX = canvas ? canvas.width - result.faceCenterX : result.faceCenterX;
@@ -172,7 +193,7 @@ export function useCaptureSequence(
       if (!onTarget) {
         if (holdStartRef.current !== null) {
           offTargetCountRef.current++;
-          if (offTargetCountRef.current > 6) {
+          if (offTargetCountRef.current > 10) {
             holdStartRef.current = null;
             capturedInStepRef.current = false;
             offTargetCountRef.current = 0;
@@ -190,7 +211,6 @@ export function useCaptureSequence(
       offTargetCountRef.current = 0;
 
       // On target — accumulate hold time
-      const now = performance.now();
       if (!holdStartRef.current) {
         holdStartRef.current = now;
       }
@@ -208,6 +228,7 @@ export function useCaptureSequence(
         }
 
         capturedInStepRef.current = true;
+        cooldownUntilRef.current = performance.now() + 500;
         const newFrames = [...prev.frames, { dataUrl, poseLabel: target.label }];
 
         // Flash animation (ref-tracked for cleanup)
@@ -236,6 +257,7 @@ export function useCaptureSequence(
             holdProgress: 1,
             isOnTarget: true,
             instruction: 'All poses captured!',
+            captureCount: prev.captureCount + 1,
           });
           return;
         }
@@ -251,6 +273,7 @@ export function useCaptureSequence(
           holdProgress: 0,
           isOnTarget: false,
           instruction: POSE_SEQUENCE[nextStep].instruction,
+          captureCount: prev.captureCount + 1,
         });
         return;
       }

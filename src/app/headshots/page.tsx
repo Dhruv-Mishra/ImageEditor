@@ -54,7 +54,9 @@ export default function HeadshotsPage() {
     if (state.phase === 'complete' && state.frames.length > 0) {
       // Stop the camera stream to save resources during upload
       streamRef.current?.getTracks().forEach((t) => t.stop());
-      uploadFrames(state.frames);
+      void uploadFrames(state.frames).catch(() => {
+        // Error is already handled inside uploadFrames via state update
+      });
     }
   }, [state.phase, state.frames, uploadFrames]);
 
@@ -67,10 +69,28 @@ export default function HeadshotsPage() {
     };
   }, []);
 
+  // --- AI Headshot Generation State ---
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [generatedImages, setGeneratedImages] = useState<Array<{ id: string; objectUrl: string }>>([]);
+  const generatedImagesRef = useRef<Array<{ id: string; objectUrl: string }>>([]);
+  generatedImagesRef.current = generatedImages;
+
+  /**
+   * Cleanup generated object URLs on unmount only (ref avoids premature revocation).
+   */
+  useEffect(() => {
+    return () => {
+      generatedImagesRef.current.forEach((img) => URL.revokeObjectURL(img.objectUrl));
+    };
+  }, []);
+
   const handleReset = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
+    generatedImagesRef.current.forEach((img) => URL.revokeObjectURL(img.objectUrl));
+    setGeneratedImages([]);
+    setGeneratingId(null);
     reset();
   }, [reset]);
 
@@ -80,10 +100,6 @@ export default function HeadshotsPage() {
   const isDone = state.phase === 'done';
   const isError = state.phase === 'error';
   const showViewfinder = !isIdle && state.phase !== 'done';
-
-  // --- AI Headshot Generation State ---
-  const [generatingId, setGeneratingId] = useState<string | null>(null);
-  const [generatedImages, setGeneratedImages] = useState<Array<{ id: string; dataUrl: string }>>([]);
 
   const handleGenerate = useCallback(async (styleId: string) => {
     const straightFrame = state.frames.find((f) => f.poseLabel === 'Straight');
@@ -108,20 +124,23 @@ export default function HeadshotsPage() {
         throw new Error(body.error || `Failed (${res.status})`);
       }
 
-      const data = await res.json();
-      setGeneratedImages((prev) => [...prev, { id: styleId, dataUrl: data.image }]);
+      // Response is binary image — create blob URL directly (no base64 parsing)
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      setGeneratedImages((prev) => [...prev, { id: styleId, objectUrl }]);
       toast.success('Headshot generated!');
     } catch (err) {
+      console.error('[headshots] Generation failed:', err);
       toast.error(err instanceof Error ? err.message : 'Generation failed');
     } finally {
       setGeneratingId(null);
     }
   }, [state.frames]);
 
-  const handleDownloadGenerated = useCallback((dataUrl: string, label: string) => {
+  const handleDownloadGenerated = useCallback((objectUrl: string, label: string) => {
     const link = document.createElement('a');
-    link.href = dataUrl;
-    link.download = `headshot-${label.toLowerCase().replace(/\s+/g, '-')}.webp`;
+    link.href = objectUrl;
+    link.download = `headshot-${label.toLowerCase().replace(/\s+/g, '-')}.png`;
     link.click();
   }, []);
 
@@ -201,6 +220,7 @@ export default function HeadshotsPage() {
               holdProgress={state.holdProgress}
               isOnTarget={state.isOnTarget}
               phase={state.phase}
+              captureCount={state.captureCount}
             />
 
             {isTracking && (
@@ -257,7 +277,6 @@ export default function HeadshotsPage() {
                 {HEADSHOT_STYLES.map((style) => {
                   const alreadyGenerated = generatedImages.some((g) => g.id === style.id);
                   const isGenerating = generatingId === style.id;
-                  const anyGenerating = generatingId !== null;
 
                   return (
                     <button
@@ -313,12 +332,12 @@ export default function HeadshotsPage() {
                     return (
                       <div key={img.id} className="group relative">
                         <img
-                          src={img.dataUrl}
+                          src={img.objectUrl}
                           alt={`Generated: ${style?.label}`}
                           className="w-full rounded-xl border border-gray-200 shadow-md dark:border-gray-700"
                         />
                         <button
-                          onClick={() => handleDownloadGenerated(img.dataUrl, style?.label || img.id)}
+                          onClick={() => handleDownloadGenerated(img.objectUrl, style?.label || img.id)}
                           className="absolute bottom-2 right-2 rounded-full bg-black/60 p-2 text-white opacity-0 transition-opacity group-hover:opacity-100"
                           title="Download"
                         >

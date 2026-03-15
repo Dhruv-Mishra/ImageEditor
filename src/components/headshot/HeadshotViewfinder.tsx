@@ -19,6 +19,7 @@ export function HeadshotViewfinder({
   holdProgress,
   isOnTarget,
   phase,
+  captureCount,
 }: {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -27,29 +28,22 @@ export function HeadshotViewfinder({
   holdProgress: number;
   isOnTarget: boolean;
   phase: CapturePhase;
+  captureCount: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showCaptureFlash, setShowCaptureFlash] = useState(false);
-  const prevStepRef = useRef(0);
 
-  // Detect when a new step starts (capture happened) → flash
+  // Flash ONLY when a real capture occurs (captureCount increases)
+  const prevCaptureCountRef = useRef(captureCount);
   useEffect(() => {
-    if (phase === 'tracking' || phase === 'holding') {
-      // currentStep comes from parent — derive from holdProgress reset pattern
-      // When holdProgress drops to 0 in tracking phase after being >0, a capture just happened
-    }
-  }, [phase]);
-
-  // Flash when frame transitions from holding to tracking (capture occurred)
-  const prevPhaseRef = useRef<CapturePhase>(phase);
-  useEffect(() => {
-    if (prevPhaseRef.current === 'holding' && phase === 'tracking' && holdProgress === 0) {
+    if (captureCount > prevCaptureCountRef.current) {
       setShowCaptureFlash(true);
-      const t = setTimeout(() => setShowCaptureFlash(false), 500);
+      const t = setTimeout(() => setShowCaptureFlash(false), 150);
+      prevCaptureCountRef.current = captureCount;
       return () => clearTimeout(t);
     }
-    prevPhaseRef.current = phase;
-  }, [phase, holdProgress]);
+    prevCaptureCountRef.current = captureCount;
+  }, [captureCount]);
 
   const syncCanvasSize = useCallback(() => {
     const video = videoRef.current;
