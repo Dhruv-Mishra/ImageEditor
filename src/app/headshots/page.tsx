@@ -35,7 +35,7 @@ export default function HeadshotsPage() {
     reset,
   } = useCaptureSequence(videoRef, canvasRef);
 
-  const isTracking = state.phase === 'tracking' || state.phase === 'holding';
+  const isTracking = state.phase === 'tracking' || state.phase === 'stabilizing' || state.phase === 'holding';
 
   const { initFaceMesh, isLoading: modelLoading, error: modelError } =
     useMediaPipeFace(videoRef, isTracking, processFrame);
@@ -333,6 +333,7 @@ export default function HeadshotsPage() {
               showInstruction={isTracking}
               holdProgress={state.holdProgress}
               isOnTarget={state.isOnTarget}
+              isStable={state.isStable}
               phase={state.phase}
               captureCount={state.captureCount}
             />
@@ -341,6 +342,8 @@ export default function HeadshotsPage() {
               <HeadshotHUD
                 currentStep={state.currentStep}
                 isOnTarget={state.isOnTarget}
+                isStable={state.isStable}
+                phase={state.phase}
               />
             )}
 

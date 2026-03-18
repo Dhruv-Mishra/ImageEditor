@@ -6,10 +6,11 @@ import { HOLD_DURATION_MS } from '@/lib/headshot/types';
 
 /**
  * Production-grade webcam viewfinder with:
- * - Video + overlay canvas
+ * - Video + overlay canvas (both CSS-mirrored for selfie view)
  * - Countdown ring + seconds text overlaid on the feed during hold
  * - Green border flash on capture
- * - Bottom instruction/tip bar
+ * - Adaptive instruction bar at top
+ * - Stabilizing indicator (yellow pulse)
  */
 export function HeadshotViewfinder({
   videoRef,
@@ -18,6 +19,7 @@ export function HeadshotViewfinder({
   showInstruction,
   holdProgress,
   isOnTarget,
+  isStable,
   phase,
   captureCount,
 }: {
@@ -27,6 +29,7 @@ export function HeadshotViewfinder({
   showInstruction?: boolean;
   holdProgress: number;
   isOnTarget: boolean;
+  isStable: boolean;
   phase: CapturePhase;
   captureCount: number;
 }) {
@@ -65,23 +68,30 @@ export function HeadshotViewfinder({
     };
   }, [videoRef, syncCanvasSize]);
 
-  const isHolding = phase === 'holding' && isOnTarget;
+  const isHolding = phase === 'holding' && isOnTarget && isStable;
+  const isStabilizing = phase === 'stabilizing' && isOnTarget;
   const secondsRemaining = (1 - holdProgress) * (HOLD_DURATION_MS / 1000);
   const secondsLeft = Math.max(1, Math.ceil(secondsRemaining - 0.05));
   const circumference = 2 * Math.PI * 44;
   const strokeOffset = circumference * (1 - holdProgress);
 
+  // Border style based on state
+  const borderClass = showCaptureFlash
+    ? 'ring-4 ring-green-400 shadow-[0_0_40px_rgba(34,197,94,0.6)]'
+    : isHolding
+      ? 'ring-3 ring-green-400 shadow-[0_0_30px_rgba(34,197,94,0.4)]'
+      : isStabilizing
+        ? 'ring-2 ring-yellow-400/60 shadow-[0_0_20px_rgba(250,204,21,0.3)]'
+        : isOnTarget && (phase === 'tracking' || phase === 'stabilizing' || phase === 'holding')
+          ? 'ring-3 ring-green-400 shadow-[0_0_30px_rgba(34,197,94,0.4)]'
+          : 'ring-1 ring-white/10';
+
   return (
     <div
       ref={containerRef}
-      className={`relative w-full overflow-hidden rounded-2xl bg-black shadow-xl aspect-[3/4] sm:aspect-video transition-all duration-200 ${
-        showCaptureFlash
-          ? 'ring-4 ring-green-400 shadow-[0_0_40px_rgba(34,197,94,0.6)]'
-          : isOnTarget && (phase === 'tracking' || phase === 'holding')
-            ? 'ring-3 ring-green-400 shadow-[0_0_30px_rgba(34,197,94,0.4)]'
-            : 'ring-1 ring-white/10'
-      }`}
+      className={`relative w-full overflow-hidden rounded-2xl bg-black shadow-xl aspect-[3/4] sm:aspect-video transition-all duration-200 ${borderClass}`}
     >
+      {/* Video — CSS-mirrored for selfie view */}
       <video
         ref={videoRef}
         autoPlay
@@ -89,9 +99,14 @@ export function HeadshotViewfinder({
         muted
         className="absolute inset-0 h-full w-full object-cover scale-x-[-1]"
       />
+
+      {/*
+        Canvas overlay — ALSO CSS-mirrored so drawing coordinates match raw camera space.
+        This eliminates all manual X-flipping in drawing code.
+      */}
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 h-full w-full object-cover pointer-events-none"
+        className="absolute inset-0 h-full w-full object-cover pointer-events-none scale-x-[-1]"
       />
 
       {/* Hold countdown — large ring + seconds on the video feed */}
@@ -100,12 +115,20 @@ export function HeadshotViewfinder({
           <div className="relative flex items-center justify-center">
             <svg width={100} height={100} className="-rotate-90">
               <circle
-                cx={50} cy={50} r={44}
-                fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth={4}
+                cx={50}
+                cy={50}
+                r={44}
+                fill="none"
+                stroke="rgba(255,255,255,0.15)"
+                strokeWidth={4}
               />
               <circle
-                cx={50} cy={50} r={44}
-                fill="none" stroke="#22c55e" strokeWidth={5}
+                cx={50}
+                cy={50}
+                r={44}
+                fill="none"
+                stroke="#22c55e"
+                strokeWidth={5}
                 strokeLinecap="round"
                 strokeDasharray={circumference}
                 strokeDashoffset={strokeOffset}
@@ -119,15 +142,29 @@ export function HeadshotViewfinder({
         </div>
       )}
 
+      {/* Stabilizing indicator */}
+      {isStabilizing && !isStable && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="rounded-full bg-black/40 px-4 py-2 backdrop-blur-sm">
+            <span className="text-sm font-semibold text-yellow-300 animate-pulse">
+              Hold steady…
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Capture flash overlay */}
       {showCaptureFlash && (
         <div className="absolute inset-0 bg-white/30 pointer-events-none animate-[fadeIn_0.1s_ease-out]" />
       )}
 
-      {/* Instruction bar — at TOP */}
+      {/* Instruction bar — at TOP with adaptive text */}
       {showInstruction && instruction && (
         <div className="absolute top-0 inset-x-0 bg-gradient-to-b from-black/70 to-transparent px-4 pt-4 pb-10">
-          <p className="text-center text-sm font-bold tracking-wide text-white drop-shadow-md sm:text-base">
+          <p
+            className="text-center text-sm font-bold tracking-wide text-white drop-shadow-md sm:text-base transition-opacity duration-300"
+            key={instruction}
+          >
             {instruction}
           </p>
         </div>

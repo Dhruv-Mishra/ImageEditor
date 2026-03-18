@@ -3,16 +3,24 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import type { HeadPose } from './types';
-import { estimateHeadPose, getForeheadPosition, getFaceMetrics } from './posemath';
+import {
+  estimateHeadPose,
+  extractPoseFromMatrix,
+  getForeheadPosition,
+  getFaceMetrics,
+} from './posemath';
+import { OneEuroFilter, FILTER_PARAMS } from './oneEuroFilter';
 
 export interface FaceTrackingResult {
+  /** Pose in DISPLAY (mirror) space — yaw negated from raw camera. */
   pose: HeadPose;
-  foreheadX: number;
+  foreheadX: number; // raw camera pixel coords
   foreheadY: number;
-  faceCenterX: number;
+  faceCenterX: number; // raw camera pixel coords
   faceCenterY: number;
-  faceScale: number;
+  faceScale: number; // face height / video height
   hasFace: boolean;
+  confidence: number; // 0–1
 }
 
 const WASM_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm';
@@ -21,7 +29,12 @@ const MODEL_URL =
 
 /**
  * Hook that initializes MediaPipe FaceLandmarker and processes video frames.
- * Uses the modern @mediapipe/tasks-vision API.
+ *
+ * Key improvements over the original:
+ *   - One Euro Filter for adaptive smoothing (less lag when moving, smooth when still)
+ *   - Yaw negated for display space (matches selfie/mirror view)
+ *   - Confidence output for downstream quality gating
+ *   - All coordinates in raw camera space (canvas CSS-mirrors to match video)
  */
 export function useMediaPipeFace(
   videoRef: React.RefObject<HTMLVideoElement | null>,
@@ -35,14 +48,39 @@ export function useMediaPipeFace(
   const [error, setError] = useState<string | null>(null);
   const onFrameRef = useRef(onFrame);
 
-  // EMA smoothing state
-  const smoothedPoseRef = useRef<HeadPose>({ pitch: 0, yaw: 0, roll: 0 });
-  const smoothedPosRef = useRef({ x: 0, y: 0 });
-  const smoothedFaceRef = useRef({ centerX: 0, centerY: 0, scale: 0 });
-  const smoothingInitRef = useRef(false);
-  const POSE_ALPHA = 0.32;
-  const POSITION_ALPHA = 0.25;
-  const FACE_ALPHA = 0.2;
+  // One Euro Filters — one per smoothed signal
+  const filtersRef = useRef<{
+    yaw: OneEuroFilter;
+    pitch: OneEuroFilter;
+    roll: OneEuroFilter;
+    posX: OneEuroFilter;
+    posY: OneEuroFilter;
+    faceCX: OneEuroFilter;
+    faceCY: OneEuroFilter;
+    faceScale: OneEuroFilter;
+  } | null>(null);
+
+  function getFilters() {
+    if (!filtersRef.current) {
+      filtersRef.current = {
+        yaw: new OneEuroFilter(30, FILTER_PARAMS.yaw.minCutoff, FILTER_PARAMS.yaw.beta),
+        pitch: new OneEuroFilter(30, FILTER_PARAMS.pitch.minCutoff, FILTER_PARAMS.pitch.beta),
+        roll: new OneEuroFilter(30, FILTER_PARAMS.roll.minCutoff, FILTER_PARAMS.roll.beta),
+        posX: new OneEuroFilter(30, FILTER_PARAMS.posX.minCutoff, FILTER_PARAMS.posX.beta),
+        posY: new OneEuroFilter(30, FILTER_PARAMS.posY.minCutoff, FILTER_PARAMS.posY.beta),
+        faceCX: new OneEuroFilter(30, FILTER_PARAMS.posX.minCutoff, FILTER_PARAMS.posX.beta),
+        faceCY: new OneEuroFilter(30, FILTER_PARAMS.posY.minCutoff, FILTER_PARAMS.posY.beta),
+        faceScale: new OneEuroFilter(30, FILTER_PARAMS.scale.minCutoff, FILTER_PARAMS.scale.beta),
+      };
+    }
+    return filtersRef.current;
+  }
+
+  function resetFilters() {
+    if (filtersRef.current) {
+      Object.values(filtersRef.current).forEach((f) => f.reset());
+    }
+  }
 
   // Keep callback ref fresh without re-triggering effects
   useEffect(() => {
@@ -55,45 +93,44 @@ export function useMediaPipeFace(
     setIsLoading(true);
     setError(null);
 
+    const createOptions = (delegate: 'GPU' | 'CPU') => ({
+      baseOptions: {
+        modelAssetPath: MODEL_URL,
+        delegate,
+      },
+      runningMode: 'VIDEO' as const,
+      numFaces: 1,
+      outputFacialTransformationMatrixes: true,
+      outputFaceBlendshapes: false,
+      minFaceDetectionConfidence: 0.5,
+      minFacePresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+    });
+
     try {
       const vision = await FilesetResolver.forVisionTasks(WASM_CDN);
 
-      const faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: MODEL_URL,
-          delegate: 'GPU',
-        },
-        runningMode: 'VIDEO',
-        numFaces: 1,
-        minFaceDetectionConfidence: 0.5,
-        minFacePresenceConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-      });
+      try {
+        landmarkerRef.current = await FaceLandmarker.createFromOptions(
+          vision,
+          createOptions('GPU'),
+        );
+      } catch {
+        // GPU failed — fall back to CPU
+        landmarkerRef.current = await FaceLandmarker.createFromOptions(
+          vision,
+          createOptions('CPU'),
+        );
+      }
 
-      landmarkerRef.current = faceLandmarker;
       setIsReady(true);
     } catch (err) {
-      // Retry with CPU delegate if GPU fails
-      try {
-        const vision = await FilesetResolver.forVisionTasks(WASM_CDN);
-        const faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath: MODEL_URL,
-            delegate: 'CPU',
-          },
-          runningMode: 'VIDEO',
-          numFaces: 1,
-          minFaceDetectionConfidence: 0.5,
-          minFacePresenceConfidence: 0.5,
-          minTrackingConfidence: 0.5,
-        });
-        landmarkerRef.current = faceLandmarker;
-        setIsReady(true);
-      } catch (cpuErr) {
-        const msg = cpuErr instanceof Error ? cpuErr.message : 'Failed to load face tracking model';
-        setError(msg);
-        throw new Error(msg);
-      }
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'Failed to load face tracking model';
+      setError(msg);
+      throw new Error(msg);
     } finally {
       setIsLoading(false);
     }
@@ -110,7 +147,7 @@ export function useMediaPipeFace(
     let running = true;
     let lastTimestamp = -1;
 
-    // Offscreen canvas for downscaled MediaPipe processing (better FPS)
+    // Offscreen canvas for downscaled MediaPipe processing
     const processCanvas = document.createElement('canvas');
     const processCtx = processCanvas.getContext('2d')!;
     const PROCESS_WIDTH = 640;
@@ -129,7 +166,7 @@ export function useMediaPipeFace(
       }
       lastTimestamp = now;
 
-      // Size canvas once (avoids per-frame reallocation)
+      // Size canvas once
       const scale = PROCESS_WIDTH / video.videoWidth;
       const processHeight = Math.round(video.videoHeight * scale);
       if (!processCanvasSized) {
@@ -144,46 +181,64 @@ export function useMediaPipeFace(
 
         if (results.faceLandmarks && results.faceLandmarks.length > 0) {
           const landmarks = results.faceLandmarks[0];
-          const rawPose = estimateHeadPose(landmarks);
-          const rawForehead = getForeheadPosition(landmarks, video.videoWidth, video.videoHeight);
-          const rawFace = getFaceMetrics(landmarks, video.videoWidth, video.videoHeight);
+          const timestamp = now / 1000; // seconds for One Euro Filter
 
-          if (!smoothingInitRef.current) {
-            smoothedPoseRef.current = rawPose;
-            smoothedPosRef.current = rawForehead;
-            smoothedFaceRef.current = rawFace;
-            smoothingInitRef.current = true;
-          } else {
-            const sp = smoothedPoseRef.current;
-            smoothedPoseRef.current = {
-              pitch: sp.pitch + POSE_ALPHA * (rawPose.pitch - sp.pitch),
-              yaw: sp.yaw + POSE_ALPHA * (rawPose.yaw - sp.yaw),
-              roll: sp.roll + POSE_ALPHA * (rawPose.roll - sp.roll),
-            };
-            const sf = smoothedPosRef.current;
-            smoothedPosRef.current = {
-              x: sf.x + POSITION_ALPHA * (rawForehead.x - sf.x),
-              y: sf.y + POSITION_ALPHA * (rawForehead.y - sf.y),
-            };
-            const sc = smoothedFaceRef.current;
-            smoothedFaceRef.current = {
-              centerX: sc.centerX + FACE_ALPHA * (rawFace.centerX - sc.centerX),
-              centerY: sc.centerY + FACE_ALPHA * (rawFace.centerY - sc.centerY),
-              scale: sc.scale + FACE_ALPHA * (rawFace.scale - sc.scale),
-            };
-          }
+          // Extract raw pose (camera space)
+          const rawPose =
+            results.facialTransformationMatrixes?.length
+              ? extractPoseFromMatrix(results.facialTransformationMatrixes[0])
+              : estimateHeadPose(landmarks);
+
+          const rawForehead = getForeheadPosition(
+            landmarks,
+            video.videoWidth,
+            video.videoHeight,
+          );
+          const rawFace = getFaceMetrics(
+            landmarks,
+            video.videoWidth,
+            video.videoHeight,
+          );
+
+          const filters = getFilters();
+
+          // Apply One Euro Filters
+          // CRITICAL: Negate yaw for display space (selfie/mirror view)
+          const filteredPose: HeadPose = {
+            yaw: filters.yaw.filter(-rawPose.yaw, timestamp),
+            pitch: filters.pitch.filter(rawPose.pitch, timestamp),
+            roll: filters.roll.filter(rawPose.roll, timestamp),
+          };
+
+          const filteredForehead = {
+            x: filters.posX.filter(rawForehead.x, timestamp),
+            y: filters.posY.filter(rawForehead.y, timestamp),
+          };
+
+          const filteredFace = {
+            centerX: filters.faceCX.filter(rawFace.centerX, timestamp),
+            centerY: filters.faceCY.filter(rawFace.centerY, timestamp),
+            scale: filters.faceScale.filter(rawFace.scale, timestamp),
+          };
+
+          // Estimate confidence from detection quality
+          const hasMatrix = !!(
+            results.facialTransformationMatrixes?.length
+          );
+          const confidence = hasMatrix ? 0.9 : 0.6;
 
           onFrameRef.current({
-            pose: smoothedPoseRef.current,
-            foreheadX: smoothedPosRef.current.x,
-            foreheadY: smoothedPosRef.current.y,
-            faceCenterX: smoothedFaceRef.current.centerX,
-            faceCenterY: smoothedFaceRef.current.centerY,
-            faceScale: smoothedFaceRef.current.scale,
+            pose: filteredPose,
+            foreheadX: filteredForehead.x,
+            foreheadY: filteredForehead.y,
+            faceCenterX: filteredFace.centerX,
+            faceCenterY: filteredFace.centerY,
+            faceScale: filteredFace.scale,
             hasFace: true,
+            confidence,
           });
         } else {
-          smoothingInitRef.current = false;
+          resetFilters();
           onFrameRef.current({
             pose: { pitch: 0, yaw: 0, roll: 0 },
             foreheadX: 0,
@@ -192,6 +247,7 @@ export function useMediaPipeFace(
             faceCenterY: 0,
             faceScale: 0,
             hasFace: false,
+            confidence: 0,
           });
         }
       } catch {
@@ -217,6 +273,7 @@ export function useMediaPipeFace(
       cancelAnimationFrame(animFrameRef.current);
       landmarkerRef.current?.close();
       landmarkerRef.current = null;
+      resetFilters();
     };
   }, []);
 
