@@ -71,3 +71,5 @@ CLAUDE.md
 *.log
 .vercel/
 .turbo/
+
+certificates

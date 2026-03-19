@@ -59,6 +59,17 @@ export function MobileNav() {
                 </Link>
 
                 <Link
+                    href="/headshots"
+                    onClick={() => vibrate('light')}
+                    className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${pathname === '/headshots' ? activeClass : inactiveClass}`}
+                >
+                    <svg className="w-5 h-5 mb-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-[10px] font-medium tracking-wide">Headshots</span>
+                </Link>
+
+                <Link
                     href="/about"
                     onClick={() => vibrate('light')}
                     className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors ${pathname === '/about' ? activeClass : inactiveClass}`}

@@ -157,7 +157,13 @@ async function main() {
 
   // 4. Start Next.js dev server
   log('Starting Next.js dev server…');
-  const frontend = spawnProcess('npx', ['next', 'dev'], { cwd: ROOT });
+  const httpsFlag = process.argv.includes('--https');
+  const nextArgs = ['next', 'dev'];
+  if (httpsFlag) {
+    nextArgs.push('--experimental-https');
+    log('HTTPS mode enabled (--experimental-https)');
+  }
+  const frontend = spawnProcess('npx', nextArgs, { cwd: ROOT });
   children.push(frontend);
 
   frontend.on('exit', (code) => {

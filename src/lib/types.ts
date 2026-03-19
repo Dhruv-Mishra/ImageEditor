@@ -93,3 +93,25 @@ export const ASPECT_RATIOS: Record<AspectRatioOption, number | undefined> = {
   '4:5': 4 / 5,
   free: undefined,
 };
+
+/** A generated headshot image stored as a blob. */
+export interface GeneratedHeadshot {
+  styleId: string;
+  blob: Blob;
+}
+
+/** Session type discriminator for archive display. */
+export type SessionType = 'crop' | 'headshot';
+
+/** Persisted headshot capture session. */
+export interface HeadshotSessionData {
+  id: string;
+  type: 'headshot';
+  /** Captured face images (webp data URLs by pose). */
+  frames: Array<{ dataUrl: string; poseLabel: string }>;
+  /** AI-generated headshot images (blobs + style IDs). */
+  generatedImages: GeneratedHeadshot[];
+  /** Base64 thumbnail for archive display (first captured frame). */
+  thumbnailDataUrl?: string;
+  createdAt: number;
+}

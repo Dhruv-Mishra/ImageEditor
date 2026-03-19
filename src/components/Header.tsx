@@ -72,6 +72,16 @@ export function Header() {
             Archive
           </Link>
           <Link
+            href="/headshots"
+            className={`text-sm font-medium transition-colors ${
+              pathname === '/headshots'
+                ? 'text-blue-600 dark:text-blue-400'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+            }`}
+          >
+            Headshots
+          </Link>
+          <Link
             href="/about"
             className={`text-sm font-medium transition-colors ${
               pathname === '/about'

@@ -1,4 +1,4 @@
-import type { HistoryEntry, SessionData } from './types';
+import type { HistoryEntry, SessionData, HeadshotSessionData } from './types';
 
 const DB_NAME = 'CropAI_DB';
 const HISTORY_STORE = 'history_store';
@@ -194,14 +194,14 @@ export async function clearSession(id: string): Promise<void> {
     }
 }
 
-export async function loadAllSessions(): Promise<SessionData[]> {
+export async function loadAllSessions(): Promise<(SessionData | HeadshotSessionData)[]> {
     try {
         const db = await getDB();
         return new Promise((resolve, reject) => {
             const tx = db.transaction(SESSION_STORE, 'readonly');
             const request = tx.objectStore(SESSION_STORE).getAll();
             request.onsuccess = () => {
-                const sessions = (request.result as SessionData[]).sort(
+                const sessions = (request.result as (SessionData | HeadshotSessionData)[]).sort(
                     (a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)
                 );
                 resolve(sessions);
@@ -211,5 +211,59 @@ export async function loadAllSessions(): Promise<SessionData[]> {
     } catch (err) {
         if (process.env.NODE_ENV === 'development') console.error('Failed to load sessions from IndexedDB', err);
         return [];
+    }
+}
+
+// ---- Headshot session persistence ----
+
+export async function saveHeadshotSession(data: HeadshotSessionData): Promise<void> {
+    try {
+        const db = await getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(SESSION_STORE, 'readwrite');
+            const store = tx.objectStore(SESSION_STORE);
+            store.put(data);
+
+            const countReq = store.count();
+            countReq.onsuccess = () => {
+                if (countReq.result > MAX_SESSIONS) {
+                    const allReq = store.getAll();
+                    allReq.onsuccess = () => {
+                        const sessions = (allReq.result as Array<SessionData | HeadshotSessionData>)
+                            .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+                        for (let i = MAX_SESSIONS; i < sessions.length; i++) {
+                            store.delete(sessions[i].id);
+                        }
+                    };
+                }
+            };
+
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    } catch (err) {
+        if (process.env.NODE_ENV === 'development') console.error('Failed to save headshot session', err);
+    }
+}
+
+export async function loadHeadshotSession(id: string): Promise<HeadshotSessionData | null> {
+    try {
+        const db = await getDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(SESSION_STORE, 'readonly');
+            const request = tx.objectStore(SESSION_STORE).get(id);
+            request.onsuccess = () => {
+                const result = request.result;
+                if (result && result.type === 'headshot') {
+                    resolve(result as HeadshotSessionData);
+                } else {
+                    resolve(null);
+                }
+            };
+            request.onerror = () => reject(request.error);
+        });
+    } catch (err) {
+        if (process.env.NODE_ENV === 'development') console.error('Failed to load headshot session', err);
+        return null;
     }
 }

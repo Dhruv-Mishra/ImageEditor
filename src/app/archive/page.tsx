@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { CropHistory } from '@/components/CropHistory';
 import { loadHistory, clearHistoryData, deleteHistoryEntry, loadAllSessions, clearSession } from '@/lib/db';
 import { searchByEmbedding, searchByTags, type VectorSearchResult } from '@/lib/vectorDb';
-import type { HistoryEntry, SessionData } from '@/lib/types';
+import type { HistoryEntry, SessionData, HeadshotSessionData } from '@/lib/types';
 import { useAppHaptics } from '@/lib/haptics';
 
 /* ------------------------------------------------------------------ */
@@ -276,7 +276,7 @@ function matchesDateFilter(timestamp: number, filter: string): boolean {
 
 export default function ArchivePage() {
     const [history, setHistory] = useState<HistoryEntry[]>([]);
-    const [sessions, setSessions] = useState<SessionData[]>([]);
+    const [sessions, setSessions] = useState<(SessionData | HeadshotSessionData)[]>([]);
 
     // Filter & sort state
     const [filterAspect, setFilterAspect] = useState('all');
@@ -327,15 +327,18 @@ export default function ArchivePage() {
     );
 
     const handleContinueSession = useCallback(
-        (session: SessionData) => {
+        (session: SessionData | HeadshotSessionData) => {
             vibrate('selection');
+            const isHeadshot = 'type' in session && session.type === 'headshot';
             try {
-                localStorage.setItem('cropai_active_session_id', session.id);
-                window.dispatchEvent(new CustomEvent('cropai:session-changed'));
+                if (isHeadshot) {
+                    localStorage.setItem('cropai_active_headshot_session_id', session.id);
+                } else {
+                    localStorage.setItem('cropai_active_session_id', session.id);
+                    window.dispatchEvent(new CustomEvent('cropai:session-changed'));
+                }
             } catch { /* ignore */ }
-            // Navigate to home, then dispatch restore event so the page picks up the session
-            // even if it's already mounted (client-side nav won't remount)
-            router.push('/edit');
+            router.push(isHeadshot ? '/headshots' : '/edit');
         },
         [router, vibrate],
     );
@@ -501,9 +504,10 @@ export default function ArchivePage() {
 
         let result = [...sessions];
 
-        // Aspect ratio (use preview dimensions)
+        // Aspect ratio (use preview dimensions — skip headshot sessions)
         if (filterAspect !== 'all') {
             result = result.filter((s) => {
+                if (!('previewWidth' in s) || !s.previewWidth) return true;
                 const ratio = s.previewWidth / s.previewHeight;
                 if (filterAspect === 'square') return ratio > 0.9 && ratio < 1.1;
                 if (filterAspect === 'portrait') return ratio <= 0.9;
@@ -523,8 +527,8 @@ export default function ArchivePage() {
         else if (sortBy === 'hr')
             result.sort(
                 (a, b) =>
-                    b.naturalWidth * b.naturalHeight -
-                    a.naturalWidth * a.naturalHeight
+                    (('naturalWidth' in b ? b.naturalWidth * b.naturalHeight : 0) || 0) -
+                    (('naturalWidth' in a ? a.naturalWidth * a.naturalHeight : 0) || 0)
             );
 
         return result;
@@ -785,7 +789,10 @@ export default function ArchivePage() {
                                 {/* Info */}
                                 <div className="p-2">
                                     <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-                                        {session.multiSuggestion?.crops.find(c => c.type === session.selectedCropType)?.label ?? session.selectedCropType} · {session.aspectRatio}
+                                        {'type' in session && session.type === 'headshot'
+                                            ? 'AI Headshot'
+                                            : `${'multiSuggestion' in session ? (session as SessionData).multiSuggestion?.crops.find((c: {type: string}) => c.type === (session as SessionData).selectedCropType)?.label ?? (session as SessionData).selectedCropType : 'Session'} · ${'aspectRatio' in session ? (session as SessionData).aspectRatio : ''}`
+                                        }
                                     </p>
                                     <p className="text-[10px] text-gray-500 dark:text-gray-400">
                                         {new Date(session.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
